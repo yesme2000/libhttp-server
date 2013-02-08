@@ -15,6 +15,10 @@ class HeaderTest : public ::testing::Test
 {
 };
 
+class HeadersTest : public ::testing::Test
+{
+};
+
 TEST_F(HeaderTest, AddDeleteClearValues)
 {
 	QList<QString> values;
@@ -76,6 +80,33 @@ TEST_F(HeaderTest, Merge)
 	EXPECT_EQ(2, values.length());
 	EXPECT_EQ("close", values[0]);
 	EXPECT_EQ("keep-alive", values[1]);
+}
+
+TEST_F(HeadersTest, AddSetDelGet)
+{
+	Headers h;
+
+	h.Set("Connection", "close");
+	h.Add("Connection", "keep-alive");
+
+	Header* conn = h.Get("Connection");
+	ASSERT_NE((Header*) 0, conn);
+
+	QList<QString> values = conn->GetValues();
+	EXPECT_EQ(2, values.length());
+	EXPECT_EQ("close", values[0]);
+	EXPECT_EQ("keep-alive", values[1]);
+
+	h.Set("Connection", "closed");
+	conn = h.Get("Connection");
+	ASSERT_NE((Header*) 0, conn);
+
+	values = conn->GetValues();
+	EXPECT_EQ(1, values.length());
+	EXPECT_EQ("closed", values[0]);
+
+	h.Delete("Connection");
+	EXPECT_EQ(0, h.Get("Connection"));
 }
 
 } /* namespace testing */

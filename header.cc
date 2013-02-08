@@ -108,5 +108,60 @@ Header::operator==(const Header& other) const
 {
 	return key_ == other.key_;
 }
+
+Headers::Headers()
+{
+}
+
+void
+Headers::Add(QString key, QString value)
+{
+	const auto& h = headers_.find(key);
+	if (h == headers_.end())
+	{
+		QList<QString> values;
+		values.push_back(value);
+		headers_.insert(key, Header(key, values));
+	}
+	else
+	{
+		h.value().AddValue(value);
+	}
+}
+
+void
+Headers::Set(QString key, QString value)
+{
+	const auto& h = headers_.find(key);
+	if (h == headers_.end())
+	{
+		QList<QString> values;
+		values.push_back(value);
+		headers_.insert(key, Header(key, values));
+	}
+	else
+	{
+		h.value().ClearValues();
+		h.value().AddValue(value);
+	}
+}
+
+void
+Headers::Delete(QString key)
+{
+	const auto& h = headers_.find(key);
+	if (h != headers_.end())
+		headers_.erase(h);
+}
+
+Header*
+Headers::Get(QString key)
+{
+	const auto& h = headers_.find(key);
+	if (h == headers_.end())
+		return 0;
+	else
+		return &h.value();
+}
 }  // namespace server
 }  // namespace http

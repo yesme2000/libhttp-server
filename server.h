@@ -156,7 +156,10 @@ public:
 	void Delete(QString key);
 
 	// Get all values associated with key.
-	void Get(QString key);
+	Header* Get(QString key);
+
+private:
+	QMap<QString, Header> headers_;
 };
 
 // Backchannel for responses back to the client.
