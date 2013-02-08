@@ -29,6 +29,11 @@
  * HTTP/HTTPS/SPDY server implementation as a library.
  */
 
+#include <QtNetwork/QHostAddress>
+#include <QtNetwork/QTcpServer>
+#include <QtCore/QString>
+#include <QtCore/QList>
+
 namespace http
 {
 namespace server
@@ -95,13 +100,13 @@ class Header
 {
 public:
 	// Construct a new header object with the given key and list of values.
-	Header(QString key, QList<QString> value);
+	Header(QString key, QList<QString> values);
 
 	// Set the name of the header to something else.
 	void SetName(QString newkey);
 
 	// Get the name the header is currently known under.
-	QString const GetName();
+	QString GetName() const;
 
 	// Add a new value to the header object. It will be appended to the end
 	// of the value list.
@@ -115,19 +120,24 @@ public:
 	void ClearValues();
 
 	// Retrieve the first value of the header, as an easy accessor.
-	QString const GetFirstValue();
+	QString GetFirstValue() const;
 
 	// Retrieve all values which are found in the header.
-	QList<QString> const GetValues();
+	QList<QString> GetValues() const;
 
 	// Merge the two header objects by adding all values from other to
 	// this vector. If the keys of the two objects differ (and the key of
 	// other is not empty), this will return false and do nothing.
-	bool Merge(Header* other);
+	bool Merge(const Header& other);
+
+	// Compare the two header objects by looking at their header names.
+	bool operator<(const Header& other) const;
+	bool operator==(const Header& other) const;
 
 private:
+	QString key_;
 	QList<QString> values_;
-}
+};
 
 // Collection of header lines.
 class Headers
@@ -147,7 +157,7 @@ public:
 
 	// Get all values associated with key.
 	void Get(QString key);
-}
+};
 
 // Backchannel for responses back to the client.
 class ResponseWriter
@@ -155,15 +165,30 @@ class ResponseWriter
 	// TODO(tonnerre): Add.
 public:
 	// Add headers to return to the requester.
-	void AddHeaders(const Headers& to_add);
+	virtual void AddHeaders(const Headers& to_add) = 0;
 
 	// Write the response out with the given status code.
-	void WriteHeader(int status_code);
+	virtual void WriteHeader(int status_code) = 0;
 
 	// Write the given data to the HTTP/SPDY/? connection. Unlike
 	// WriteHeader, this can be called repeatedly. If WriteHeader hasn't
 	// been called, it is invoked with an status 200 (OK).
-	int Write(QByteArray data);
+	virtual int Write(QByteArray data) = 0;
+};
+
+struct Cookie
+{
+	QString name;
+	QString value;
+	QString path;
+	QString domain;
+	unsigned long expires;
+	unsigned long max_age;
+	bool secure;
+	bool http_only;
+	QString raw;
+
+	QString ToString() const;
 };
 
 // HTTP/SPDY/? request object.
@@ -201,7 +226,7 @@ public:
 	void ListenAndServe(QString addr, Protocol* proto);
 
 	// Serve as the protocol proto on the TCP service srv.
-	void Serve(QTcpService* srv, Protocol* proto);
+	void Serve(QTcpServer* srv, Protocol* proto);
 };
 }  // namespace server
 }  // namespace http
