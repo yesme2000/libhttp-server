@@ -45,7 +45,7 @@ class Request;
 class Peer
 {
 public:
-	QHostAddress peerAddress();
+	virtual QHostAddress peerAddress() = 0;
 };
 
 // Callback class to receive information from a Protocol implementation.
