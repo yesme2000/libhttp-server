@@ -1,10 +1,11 @@
-TESTS=				header_test
+TESTS=				header_test cookie_test
 check_PROGRAMS=			${TESTS}
 lib_LTLIBRARIES=		libhttp-server.la
 httpserverincludedir=		${includedir}/http
 httpserverinclude_HEADERS=	server.h
 
-libhttp_server_la_SOURCES=	server.cc connection.cc http.cc header.cc
+libhttp_server_la_SOURCES=	server.cc connection.cc http.cc		\
+				header.cc cookie.cc
 libhttp_server_la_LDFLAGS=	-version-info ${LIBRARY_VERSION}
 libhttp_server_la_LIBADD=	${AC_LIBS}
 

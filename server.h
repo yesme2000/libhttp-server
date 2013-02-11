@@ -29,10 +29,12 @@
  * HTTP/HTTPS/SPDY server implementation as a library.
  */
 
+#include <QtCore/QDateTime>
+#include <QtCore/QList>
+#include <QtCore/QString>
+
 #include <QtNetwork/QHostAddress>
 #include <QtNetwork/QTcpServer>
-#include <QtCore/QString>
-#include <QtCore/QList>
 
 namespace http
 {
@@ -181,14 +183,25 @@ public:
 
 struct Cookie
 {
+	Cookie();
+
 	QString name;
 	QString value;
 	QString path;
 	QString domain;
-	unsigned long expires;
+	QString comment_url;
+
+	QDateTime expires;
+
 	unsigned long max_age;
-	bool secure;
+	unsigned long rfc;
+	unsigned long version;
+	unsigned short port;
+
+	bool discard;
 	bool http_only;
+	bool secure;
+
 	QString raw;
 
 	QString ToString() const;
