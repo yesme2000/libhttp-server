@@ -29,8 +29,10 @@
  * HTTP/HTTPS/SPDY server implementation as a library.
  */
 
+#include <thread++/threadpool.h>
 #include <QtCore/QDateTime>
 #include <QtCore/QList>
+#include <QtCore/QScopedPointer>
 #include <QtCore/QString>
 
 #include <QtNetwork/QHostAddress>
@@ -41,13 +43,18 @@ namespace http
 namespace server
 {
 class Headers;
+class Protocol;
 class Request;
+class ServeMux;
 
 // Representation of the connections peer.
 class Peer
 {
 public:
-	virtual QHostAddress peerAddress() = 0;
+	virtual Protocol* PeerProtocol() = 0;
+	virtual QHostAddress PeerAddress() = 0;
+	virtual QAbstractSocket* PeerSocket() = 0;
+	virtual QTcpServer* Parent() = 0;
 };
 
 // Callback class to receive information from a Protocol implementation.
@@ -56,26 +63,22 @@ public:
 class ProtocolObserver
 {
 public:
-	// Get a new ID to identify the session, if required. May always
-	// return 0 if it is always clear what session will be used.
-	virtual int GetNewSid() = 0;
-
 	// Reset all data received from the protocol for the given session,
 	// e.g. if a new connection was made.
-	virtual void ClearProtocolData(int sid) = 0;
+	virtual void ClearProtocolData(Peer* p) = 0;
 
 	// Sets the headers for the given connection SID to exactly the value.
-	virtual void SetHeader(int sid, Headers new_headers) = 0;
+	virtual void SetHeader(Peer* p, Headers new_headers) = 0;
 
 	// Adds the given header to the currently known set (for protocols with
 	// incremental headers).
-	virtual void AddHeader(int sid, Headers incremental_headers) = 0;
+	virtual void AddHeader(Peer* p, Headers incremental_headers) = 0;
 
 	// Removes the given headers from the currently known set.
-	virtual void RemoveHeader(int sid, Headers decremental_headers) = 0;
+	virtual void RemoveHeader(Peer* p, Headers decremental_headers) = 0;
 
 	// Indicates that a new request has been recevied.
-	virtual void ProcessRequest(int sid, Request* req) = 0;
+	virtual void ProcessRequest(Peer* p, Request* req) = 0;
 };
 
 // Wire protocol decoder class.
@@ -94,7 +97,8 @@ public:
 
 	// Instruct the protocol decoder to start decoding the data on the
 	// socket.
-	virtual void DecodeConnection(QAbstractSocket* sock) = 0;
+	virtual void DecodeConnection(threadpp::ThreadPool* executor,
+			ServeMux* mux, Peer* peer) = 0;
 };
 
 // A regular HTTP/SPDY/? header. Can contain multiple values.
@@ -230,10 +234,29 @@ public:
 	virtual void ServeHTTP(const ResponseWriter& w, Request* req) = 0;
 };
 
-// The actual HTTP server.
+// Helper class for distributing the requests efficiently to their handlers.
+class ServeMux
+{
+public:
+	// Handle all requests to a regexp matching pattern using handler.
+	void Handle(QString pattern, Handler* handler);
+
+	// Find the handler for the given URL (closest matching pattern).
+	Handler* GetHandler(QString URL);
+
+private:
+	QMap<QString, Handler*> candidates_;
+};
+
+// The actual HTTP server. By default, it runs on a threadpool with 10
+// worker threads which it creates internally.
 class Server
 {
 public:
+	// Set up the data structures for a new web server, but don't start
+	// anything yet.
+	Server();
+
 	// Handle all requests to a regexp matching pattern using handler.
 	void Handle(QString pattern, Handler* handler);
 
@@ -241,8 +264,42 @@ public:
 	// addr.
 	void ListenAndServe(QString addr, Protocol* proto);
 
-	// Serve as the protocol proto on the TCP service srv.
+	// Serve as the protocol proto on the TCP service srv. This method
+	// will block forever, waiting for new connections. If you want to
+	// run it in a threadpool, please set one up using SetExecutor() and
+	// run Serve in it as a closure.
 	void Serve(QTcpServer* srv, Protocol* proto);
+
+	// Overrides the default executor with a new one. Must be called
+	// before Serve() or ListenAndServe(), but not necessarily before
+	// Handle(). Passing a zero argument will revert to the default
+	// behavior of creating a built-in threadpool. Takes ownership of
+	// the threadpool.
+	void SetExecutor(threadpp::ThreadPool* executor);
+
+	// Sets the desired number of threads for the pool. After running
+	// SetExecutor() with a nonzero arg, Serve() or ListenAndServe(), this
+	// will have no effect.
+	void SetNumThreads(uint32_t num_threads);
+
+	// Gets the associated threadpool in case something else wants to
+	// run in it.
+	threadpp::ThreadPool* GetExecutor();
+
+	// Instruct the server to stop accepting connections. Another call
+	// to Serve() or ListenAndServe() will make it resume. If you want
+	// to wait until all outstanding connections have been terminated,
+	// use SetExecutor(0) or call the destructor.
+	void Shutdown();
+
+private:
+	void ServeConnection(Peer* peer);
+
+	ServeMux multiplexer_;
+	QMutex executor_lock_;
+	QScopedPointer<threadpp::ThreadPool> executor_;
+	uint32_t num_threads_;
+	bool shutdown_;
 };
 }  // namespace server
 }  // namespace http
