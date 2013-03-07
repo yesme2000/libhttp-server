@@ -283,7 +283,7 @@ private:
 
 // The actual HTTP server. By default, it runs on a threadpool with 10
 // worker threads which it creates internally.
-class WebServer : public toolbox::siot::ConnectionCallback
+class WebServer
 {
 public:
 	// Set up the data structures for a new web server, but don't start
@@ -291,12 +291,6 @@ public:
 	WebServer();
 
 	virtual ~WebServer();
-
-	// Implements ConnectionCallback.
-	virtual void ConnectionEstablished(Connection* conn);
-	virtual void DataReady(Connection* conn);
-	virtual void ConnectionTerminated(Connection* conn);
-	virtual void Error(Connection* conn);
 
 	// Handle all requests to a regexp matching pattern using handler.
 	void Handle(string pattern, Handler* handler);
@@ -343,5 +337,25 @@ private:
 	uint32_t num_threads_;
 	bool shutdown_;
 };
+
+// An instance of the server taking care of a specific protocol.
+class ProtocolServer : public toolbox::siot::ConnectionCallback
+{
+public:
+	ProtocolServer(WebServer* parent, Protocol* proto, ServeMux* mux);
+	virtual ~ProtocolServer();
+
+	// Implements ConnectionCallback.
+	virtual void ConnectionEstablished(Connection* conn);
+	virtual void DataReady(Connection* conn);
+	virtual void ConnectionTerminated(Connection* conn);
+	virtual void Error(Connection* conn);
+
+private:
+	WebServer* parent_;
+	Protocol* proto_;
+	ServeMux* multiplexer_;
+};
+
 }  // namespace server
 }  // namespace http

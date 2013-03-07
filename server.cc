@@ -113,7 +113,8 @@ WebServer::Serve(Server* srv, Protocol* proto)
 	if (executor_.IsNull())
 		executor_.Reset(new ThreadPool(num_threads_));
 
-	srv->SetConnectionCallback(this);
+	srv->SetConnectionCallback(new ProtocolServer(this, proto,
+				&multiplexer_));
 	servers_.push_back(srv);
 	srv->Listen();
 }
@@ -151,23 +152,34 @@ WebServer::ServeConnection(Peer* peer)
 	proto->DecodeConnection(executor_.Get(), &multiplexer_, peer);
 }
 
-void
-WebServer::DataReady(Connection* conn)
+ProtocolServer::ProtocolServer(WebServer* parent, Protocol* proto, ServeMux* mux)
+: parent_(parent), proto_(proto), multiplexer_(mux)
+{
+}
+
+ProtocolServer::~ProtocolServer()
 {
 }
 
 void
-WebServer::ConnectionEstablished(Connection* conn)
+ProtocolServer::DataReady(Connection* conn)
+{
+	TCPPeer peer(proto_, conn);
+	proto_->DecodeConnection(parent_->GetExecutor(), multiplexer_, &peer);
+}
+
+void
+ProtocolServer::ConnectionEstablished(Connection* conn)
 {
 }
 
 void
-WebServer::ConnectionTerminated(Connection* conn)
+ProtocolServer::ConnectionTerminated(Connection* conn)
 {
 }
 
 void
-WebServer::Error(Connection* conn)
+ProtocolServer::Error(Connection* conn)
 {
 }
 
