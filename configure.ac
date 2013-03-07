@@ -9,14 +9,6 @@ AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE
 LT_INIT
 
-AC_ARG_WITH([qt-includes], [AC_HELP_STRING([--with-qt-includes=DIR],
-	    [Path to the QT headers])], [INCLUDES="$INCLUDES -I${withval}"])
-AC_ARG_WITH([qt-libs], [AC_HELP_STRING([--with-qt-libs=DIR],
-	    [Path to the QT libraries])],
-	    LDFLAGS="${LDFLAGS} -L${withval} -L${withval}"])
-AC_SUBST(INCLUDES)
-AC_SUBST(LDFLAGS)
-
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
@@ -40,7 +32,6 @@ AC_SUBST(CXXFLAGS)
 
 # Checks for libraries.
 GTEST_LIBS=""
-QT_LIBS=""
 AC_CHECK_LIB([z], [crc32],
 	     [AC_LIBS="$AC_LIBS -lz"])
 AC_CHECK_LIB([thread++], [main],
@@ -54,6 +45,9 @@ AC_CHECK_LIB([glog], [main],
 AC_CHECK_LIB([toolbox], [main],
 	     [AC_LIBS="$AC_LIBS -ltoolbox"],
 	     [AC_ERROR(libtoolbox is required)])
+AC_CHECK_LIB([siot], [main],
+	     [AC_LIBS="$AC_LIBS -lsiot"],
+	     [AC_ERROR(libsiot is required)])
 ORIGLIBS="${LIBS}"
 LIBS="${LIBS} ${AC_LIBS}"
 AC_CHECK_LIB([protobuf], [main],
@@ -64,22 +58,13 @@ AC_CHECK_LIB([gtest], [main],
 	     [GTEST_LIBS="$GTEST_LIBS -lgtest"])
 AC_CHECK_LIB([gtest_main], [main],
 	     [GTEST_LIBS="$GTEST_LIBS -lgtest_main"])
-AC_CHECK_LIB([QtCore], [main],
-	     [QT_LIBS="$QT_LIBS -lQtCore"],
-	     [AC_ERROR(Qt is required)])
-AC_CHECK_LIB([QtNetwork], [main],
-	     [QT_LIBS="$QT_LIBS -lQtNetwork"],
-	     [AC_ERROR(Qt is required)])
-AC_LIBS="$AC_LIBS $QT_LIBS"
 AC_SUBST(GTEST_LIBS)
-AC_SUBST(QT_LIBS)
 AC_SUBST(AC_LIBS)
 
 # Checks for header files.
 old_CPPFLAGS="$CPPFLAGS"
 CPPFLAGS="$CPPFLAGS $INCLUDES"
-AC_CHECK_HEADERS([QtCore/QByteArray QtCore/QString QtCore/QFile	\
-		  toolbox/expvar.h])
+AC_CHECK_HEADERS([siot/server.h siot/connection.h toolbox/expvar.h])
 CPPFLAGS="$old_CPPFLAGS"
 
 # Checks for typedefs, structures, and compiler characteristics.

@@ -27,26 +27,34 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <QtNetwork/QTcpServer>
-#include <QtNetwork/QTcpSocket>
-#include <QtCore/QScopedPointer>
-#include <QtCore/QString>
+#include <mutex>
+#include <siot/connection.h>
+#include <siot/server.h>
+#include <string>
 #include <thread++/threadpool.h>
+#include <toolbox/scopedptr.h>
 #include "server.h"
-
-using threadpp::ThreadPool;
-using google::protobuf::Closure;
-using google::protobuf::NewCallback;
 
 namespace http
 {
 namespace server
 {
+using google::protobuf::Closure;
+using google::protobuf::NewCallback;
+using std::map;
+using std::mutex;
+using std::string;
+using std::unique_lock;
+using threadpp::ThreadPool;
+using toolbox::siot::Connection;
+using toolbox::siot::Server;
+
 class TCPPeer : public Peer
 {
 public:
-	TCPPeer(Protocol* proto, const QHostAddress& address,
-			QTcpSocket* sock, QTcpServer* parent)
+	TCPPeer(Protocol* proto, const string& address,
+			Connection* sock,
+		       	Server* parent)
 	: proto_(proto), address_(address), sock_(sock), parent_(parent)
 	{
 	}
@@ -56,117 +64,119 @@ public:
 		return proto_;
 	}
 
-	virtual QHostAddress PeerAddress()
+	virtual string PeerAddress()
 	{
 		return address_;
 	}
 
-	virtual QAbstractSocket* PeerSocket()
+	virtual Connection* PeerSocket()
 	{
 		return sock_;
 	}
 
-	virtual QTcpServer* Parent()
+	virtual Server* Parent()
 	{
 		return parent_;
 	}
 
 private:
 	Protocol* proto_;
-	QHostAddress address_;
-	QTcpSocket* sock_;
-	QTcpServer* parent_;
+	string address_;
+	Connection* sock_;
+	Server* parent_;
 };
 
-Server::Server()
+WebServer::WebServer()
 : num_threads_(10), shutdown_(false)
 {
 }
 
+WebServer::~WebServer()
+{
+}
+
 void
-Server::Handle(QString pattern, Handler* handler)
+WebServer::Handle(string pattern, Handler* handler)
 {
 	multiplexer_.Handle(pattern, handler);
 }
 
 void
-Server::ListenAndServe(QString addr, Protocol* protocol)
+WebServer::ListenAndServe(string addr, Protocol* protocol)
 {
-	int colon = addr.lastIndexOf(':');
-	QHostAddress l_addr;
-	qint16 port;
-
-	if (colon == -1)
-	{
-		l_addr = QHostAddress::Any;
-		port = addr.toShort();
-	}
-	else
-	{
-		l_addr = QHostAddress(addr.left(colon-1));
-		port = addr.right(addr.length() - colon).toShort();
-	}
-
-	QTcpServer srv;
-	srv.listen(l_addr, port);
+	Server srv(addr, 0, num_threads_);
 	Serve(&srv, protocol);
 }
 
 void
-Server::Serve(QTcpServer* srv, Protocol* proto)
+WebServer::Serve(Server* srv, Protocol* proto)
 {
 	shutdown_ = false;
-	QMutexLocker lk(&executor_lock_);
+	unique_lock<mutex> lk(executor_lock_);
 
-	if (executor_.isNull())
-		executor_.reset(new ThreadPool(num_threads_));
+	if (executor_.IsNull())
+		executor_.Reset(new ThreadPool(num_threads_));
 
-	while (!shutdown_)
-	{
-		while (srv->hasPendingConnections())
-		{
-			QTcpSocket* s = srv->nextPendingConnection();
-			Peer* p = new TCPPeer(proto, s->peerAddress(),
-					s, srv);
-			Closure* c =
-				NewCallback(this, &Server::ServeConnection, p);
-			executor_->Add(c);
-		}
-
-		srv->waitForNewConnection(-1);
-	}
+	srv->SetConnectionCallback(this);
+	servers_.push_back(srv);
+	srv->Listen();
 }
 
 void
-Server::SetExecutor(ThreadPool* executor)
+WebServer::SetExecutor(ThreadPool* executor)
 {
-	QMutexLocker lk(&executor_lock_);
-	executor_.reset(executor);
+	unique_lock<mutex> lk(executor_lock_);
+	executor_.Reset(executor);
 }
 
 void
-Server::SetNumThreads(uint32_t num_threads)
+WebServer::SetNumThreads(uint32_t num_threads)
 {
 	num_threads_ = num_threads;
 }
 
 void
-Server::Shutdown()
+WebServer::Shutdown()
 {
-	shutdown_ = true;
+	for (Server* srv : servers_)
+		srv->Shutdown();
 }
 
 ThreadPool*
-Server::GetExecutor()
+WebServer::GetExecutor()
 {
-	return executor_.data();
+	return executor_.Get();
 }
 
 void
-Server::ServeConnection(Peer* peer)
+WebServer::ServeConnection(Peer* peer)
 {
 	Protocol* proto = peer->PeerProtocol();
-	proto->DecodeConnection(executor_.data(), &multiplexer_, peer);
+	proto->DecodeConnection(executor_.Get(), &multiplexer_, peer);
+}
+
+void
+WebServer::DataReady(Connection* conn)
+{
+}
+
+void
+WebServer::ConnectionEstablished(Connection* conn)
+{
+}
+
+void
+WebServer::ConnectionTerminated(Connection* conn)
+{
+}
+
+void
+WebServer::Error(Connection* conn)
+{
+}
+
+Protocol::~Protocol()
+{
 }
 }  // namespace server
 }  // namespace http

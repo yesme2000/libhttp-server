@@ -27,41 +27,48 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <QtCore/QList>
-#include <QtCore/QString>
+#include <list>
+#include <string>
 #include "server.h"
 
 namespace http
 {
 namespace server
 {
-Header::Header(QString key, QList<QString> values)
+using std::list;
+using std::string;
+
+Header::Header(string key, list<string> values)
 : key_(key), values_(values)
 {
 }
 
+Header::~Header()
+{
+}
+
 void
-Header::SetName(QString newkey)
+Header::SetName(string newkey)
 {
 	key_ = newkey;
 }
 
-QString
+string
 Header::GetName() const
 {
 	return key_;
 }
 
 void
-Header::AddValue(QString value)
+Header::AddValue(string value)
 {
-	values_.append(value);
+	values_.push_back(value);
 }
 
 void
-Header::DeleteValue(QString value)
+Header::DeleteValue(string value)
 {
-	values_.removeAll(value);
+	values_.remove(value);
 }
 
 void
@@ -70,15 +77,15 @@ Header::ClearValues()
 	values_.clear();
 }
 
-QString
+string
 Header::GetFirstValue() const
 {
-	if (values_.isEmpty())
-		return QString();
-	return values_.first();
+	if (values_.empty())
+		return string();
+	return values_.front();
 }
 
-QList<QString>
+list<string>
 Header::GetValues() const
 {
 	return values_;
@@ -93,7 +100,8 @@ Header::Merge(const Header& other)
 	if (other.key_ != key_ && other.key_.length() > 0)
 		return false;
 
-	values_ += other.values_;
+	values_.insert(values_.end(), other.values_.begin(),
+		       	other.values_.end());
 	return true;
 }
 
@@ -113,41 +121,45 @@ Headers::Headers()
 {
 }
 
+Headers::~Headers()
+{
+}
+
 void
-Headers::Add(QString key, QString value)
+Headers::Add(string key, string value)
 {
 	const auto& h = headers_.find(key);
 	if (h == headers_.end())
 	{
-		QList<QString> values;
+		list<string> values;
 		values.push_back(value);
-		headers_.insert(key, Header(key, values));
+		headers_.insert(std::make_pair(key, Header(key, values)));
 	}
 	else
 	{
-		h.value().AddValue(value);
+		h->second.AddValue(value);
 	}
 }
 
 void
-Headers::Set(QString key, QString value)
+Headers::Set(string key, string value)
 {
 	const auto& h = headers_.find(key);
 	if (h == headers_.end())
 	{
-		QList<QString> values;
+		list<string> values;
 		values.push_back(value);
-		headers_.insert(key, Header(key, values));
+		headers_.insert(std::make_pair(key, Header(key, values)));
 	}
 	else
 	{
-		h.value().ClearValues();
-		h.value().AddValue(value);
+		h->second.ClearValues();
+		h->second.AddValue(value);
 	}
 }
 
 void
-Headers::Delete(QString key)
+Headers::Delete(string key)
 {
 	const auto& h = headers_.find(key);
 	if (h != headers_.end())
@@ -155,13 +167,13 @@ Headers::Delete(QString key)
 }
 
 Header*
-Headers::Get(QString key)
+Headers::Get(string key)
 {
 	const auto& h = headers_.find(key);
 	if (h == headers_.end())
 		return 0;
 	else
-		return &h.value();
+		return &h->second;
 }
 }  // namespace server
 }  // namespace http

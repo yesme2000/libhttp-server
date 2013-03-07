@@ -29,32 +29,48 @@
  * HTTP/HTTPS/SPDY server implementation as a library.
  */
 
+#include <chrono>
+#include <list>
+#include <map>
+#include <mutex>
+#include <siot/connection.h>
+#include <string>
 #include <thread++/threadpool.h>
-#include <QtCore/QDateTime>
-#include <QtCore/QList>
-#include <QtCore/QScopedPointer>
-#include <QtCore/QString>
-
-#include <QtNetwork/QHostAddress>
-#include <QtNetwork/QTcpServer>
+#include <toolbox/scopedptr.h>
+#include <siot/server.h>
 
 namespace http
 {
 namespace server
 {
+using std::string;
+using std::list;
+using std::map;
+using std::mutex;
+using toolbox::ScopedPtr;
+
+using toolbox::siot::Connection;
+using toolbox::siot::ConnectionCallback;
+using toolbox::siot::Server;
+
 class Headers;
 class Protocol;
 class Request;
 class ServeMux;
 
+// Convert a string to a URL encoded string.
+string URLEncode(string input, bool skip_spaces = false);
+
 // Representation of the connections peer.
 class Peer
 {
 public:
+	virtual ~Peer();
+
 	virtual Protocol* PeerProtocol() = 0;
-	virtual QHostAddress PeerAddress() = 0;
-	virtual QAbstractSocket* PeerSocket() = 0;
-	virtual QTcpServer* Parent() = 0;
+	virtual string PeerAddress() = 0;
+	virtual Connection* PeerSocket() = 0;
+	virtual Server* Parent() = 0;
 };
 
 // Callback class to receive information from a Protocol implementation.
@@ -63,6 +79,8 @@ public:
 class ProtocolObserver
 {
 public:
+	virtual ~ProtocolObserver();
+
 	// Reset all data received from the protocol for the given session,
 	// e.g. if a new connection was made.
 	virtual void ClearProtocolData(Peer* p) = 0;
@@ -85,6 +103,8 @@ public:
 class Protocol
 {
 public:
+	virtual ~Protocol();
+
 	// Create a protocol parser for HTTP and return it.
 	static Protocol* HTTP();
 
@@ -106,30 +126,32 @@ class Header
 {
 public:
 	// Construct a new header object with the given key and list of values.
-	Header(QString key, QList<QString> values);
+	Header(string key, list<string> values);
+
+	virtual ~Header();
 
 	// Set the name of the header to something else.
-	void SetName(QString newkey);
+	void SetName(string newkey);
 
 	// Get the name the header is currently known under.
-	QString GetName() const;
+	string GetName() const;
 
 	// Add a new value to the header object. It will be appended to the end
 	// of the value list.
-	void AddValue(QString value);
+	void AddValue(string value);
 
 	// Remove the value from the list of values for the header. If there
 	// is no such value in the list, this does nothing.
-	void DeleteValue(QString value);
+	void DeleteValue(string value);
 
 	// Removes all values for the header.
 	void ClearValues();
 
 	// Retrieve the first value of the header, as an easy accessor.
-	QString GetFirstValue() const;
+	string GetFirstValue() const;
 
 	// Retrieve all values which are found in the header.
-	QList<QString> GetValues() const;
+	list<string> GetValues() const;
 
 	// Merge the two header objects by adding all values from other to
 	// this vector. If the keys of the two objects differ (and the key of
@@ -141,8 +163,8 @@ public:
 	bool operator==(const Header& other) const;
 
 private:
-	QString key_;
-	QList<QString> values_;
+	string key_;
+	list<string> values_;
 };
 
 // Collection of header lines.
@@ -151,21 +173,22 @@ class Headers
 public:
 	// Create a new empty header list.
 	Headers();
+	virtual ~Headers();
 
 	// Add value as a new header value for key.
-	void Add(QString key, QString value);
+	void Add(string key, string value);
 
 	// Replace all values recorded for key with value.
-	void Set(QString key, QString value);
+	void Set(string key, string value);
 
 	// Remove all values recorded for key, if any.
-	void Delete(QString key);
+	void Delete(string key);
 
 	// Get all values associated with key.
-	Header* Get(QString key);
+	Header* Get(string key);
 
 private:
-	QMap<QString, Header> headers_;
+	map<string, Header> headers_;
 };
 
 // Backchannel for responses back to the client.
@@ -173,6 +196,8 @@ class ResponseWriter
 {
 	// TODO(tonnerre): Add.
 public:
+	virtual ~ResponseWriter();
+
 	// Add headers to return to the requester.
 	virtual void AddHeaders(const Headers& to_add) = 0;
 
@@ -181,21 +206,23 @@ public:
 
 	// Write the given data to the HTTP/SPDY/? connection. Unlike
 	// WriteHeader, this can be called repeatedly. If WriteHeader hasn't
-	// been called, it is invoked with an status 200 (OK).
-	virtual int Write(QByteArray data) = 0;
+	// been called, it is invoked with a status 200 (OK).
+	virtual int Write(string data) = 0;
 };
 
 struct Cookie
 {
 	Cookie();
+	virtual ~Cookie();
 
-	QString name;
-	QString value;
-	QString path;
-	QString domain;
-	QString comment_url;
+	string name;
+	string value;
+	string path;
+	string domain;
+	string comment_url;
 
-	QDateTime expires;
+	std::chrono::time_point<std::chrono::system_clock,
+	       std::chrono::seconds>* expires;
 
 	unsigned long max_age;
 	unsigned long rfc;
@@ -206,9 +233,9 @@ struct Cookie
 	bool http_only;
 	bool secure;
 
-	QString raw;
+	string raw;
 
-	QString ToString() const;
+	string ToString() const;
 };
 
 // HTTP/SPDY/? request object.
@@ -216,19 +243,23 @@ class Request
 {
 	// TODO(tonnerre): Add.
 public:
+	virtual ~Request();
+
 	void AddCookie(Cookie* c);
-	QList<Cookie*> GetCookies();
-	QString FirstFormValue(QString key);
+	list<Cookie*> GetCookies();
+	string FirstFormValue(string key);
 	bool ProtoAtLeast(int major, int minor);
-	QString Referer();
-	QString UserAgent();
-	void SetBasicAuth(QString username, QString password);
+	string Referer();
+	string UserAgent();
+	void SetBasicAuth(string username, string password);
 };
 
 // Prototype for a handler for requests.
 class Handler
 {
 public:
+	virtual ~Handler();
+
 	// Serve the request "req" writing the response out to "w".
 	// The details are left to the implementor.
 	virtual void ServeHTTP(const ResponseWriter& w, Request* req) = 0;
@@ -238,37 +269,47 @@ public:
 class ServeMux
 {
 public:
+	virtual ~ServeMux();
+
 	// Handle all requests to a regexp matching pattern using handler.
-	void Handle(QString pattern, Handler* handler);
+	void Handle(string pattern, Handler* handler);
 
 	// Find the handler for the given URL (closest matching pattern).
-	Handler* GetHandler(QString URL);
+	Handler* GetHandler(string URL);
 
 private:
-	QMap<QString, Handler*> candidates_;
+	map<string, Handler*> candidates_;
 };
 
 // The actual HTTP server. By default, it runs on a threadpool with 10
 // worker threads which it creates internally.
-class Server
+class WebServer : public toolbox::siot::ConnectionCallback
 {
 public:
 	// Set up the data structures for a new web server, but don't start
 	// anything yet.
-	Server();
+	WebServer();
+
+	virtual ~WebServer();
+
+	// Implements ConnectionCallback.
+	virtual void ConnectionEstablished(Connection* conn);
+	virtual void DataReady(Connection* conn);
+	virtual void ConnectionTerminated(Connection* conn);
+	virtual void Error(Connection* conn);
 
 	// Handle all requests to a regexp matching pattern using handler.
-	void Handle(QString pattern, Handler* handler);
+	void Handle(string pattern, Handler* handler);
 
 	// Listen and serve using the protocol decoder proto on the address
 	// addr.
-	void ListenAndServe(QString addr, Protocol* proto);
+	void ListenAndServe(string addr, Protocol* proto);
 
 	// Serve as the protocol proto on the TCP service srv. This method
 	// will block forever, waiting for new connections. If you want to
 	// run it in a threadpool, please set one up using SetExecutor() and
 	// run Serve in it as a closure.
-	void Serve(QTcpServer* srv, Protocol* proto);
+	void Serve(Server* srv, Protocol* proto);
 
 	// Overrides the default executor with a new one. Must be called
 	// before Serve() or ListenAndServe(), but not necessarily before
@@ -296,8 +337,9 @@ private:
 	void ServeConnection(Peer* peer);
 
 	ServeMux multiplexer_;
-	QMutex executor_lock_;
-	QScopedPointer<threadpp::ThreadPool> executor_;
+	mutex executor_lock_;
+	ScopedPtr<threadpp::ThreadPool> executor_;
+	list<Server*> servers_;
 	uint32_t num_threads_;
 	bool shutdown_;
 };
