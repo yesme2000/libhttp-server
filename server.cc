@@ -52,10 +52,8 @@ using toolbox::siot::Server;
 class TCPPeer : public Peer
 {
 public:
-	TCPPeer(Protocol* proto, const string& address,
-			Connection* sock,
-		       	Server* parent)
-	: proto_(proto), address_(address), sock_(sock), parent_(parent)
+	TCPPeer(Protocol* proto, Connection* sock)
+	: proto_(proto), sock_(sock)
 	{
 	}
 
@@ -66,7 +64,7 @@ public:
 
 	virtual string PeerAddress()
 	{
-		return address_;
+		return sock_->PeerAsText();
 	}
 
 	virtual Connection* PeerSocket()
@@ -76,14 +74,12 @@ public:
 
 	virtual Server* Parent()
 	{
-		return parent_;
+		return sock_->GetServer();
 	}
 
 private:
 	Protocol* proto_;
-	string address_;
 	Connection* sock_;
-	Server* parent_;
 };
 
 WebServer::WebServer()
