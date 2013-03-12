@@ -27,7 +27,6 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <map>
 #include <string>
 
 #include "server.h"
@@ -37,16 +36,53 @@ namespace http
 {
 namespace server
 {
+using toolbox::siot::Connection;
 using std::string;
 
-ServeMux::~ServeMux()
+ResponseWriter::~ResponseWriter()
+{
+}
+
+HTTPResponseWriter::HTTPResponseWriter(Connection* conn)
+: conn_(conn), written_(false)
+{
+}
+
+HTTPResponseWriter::~HTTPResponseWriter()
 {
 }
 
 void
-ServeMux::Handle(string pattern, Handler* handler)
+HTTPResponseWriter::AddHeaders(const Headers& to_add)
 {
-	candidates_.insert(std::make_pair(pattern, handler));
+	headers_.Merge(to_add);
+}
+
+void
+HTTPResponseWriter::WriteHeader(int status_code, string message)
+{
+	if (!headers_.Get("Connection"))
+		headers_.Set("Connection", "keep-alive");
+
+	conn_->Send("HTTP/1.1 " + std::to_string(status_code) +
+			" " + message + "\r\n");
+	for (const string& h_name : headers_.HeaderNames())
+	{
+		const Header* hdr = headers_.Get(h_name);
+
+		for (const string& value : hdr->GetValues())
+			conn_->Send(h_name + ": " + value + "\r\n");
+	}
+
+	conn_->Send("\r\n");
+}
+
+int
+HTTPResponseWriter::Write(string data)
+{
+	if (!written_)
+		WriteHeader(200);
+	return conn_->Send(data);
 }
 }  // namespace server
 }  // namespace http

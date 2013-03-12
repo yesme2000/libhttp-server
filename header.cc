@@ -166,14 +166,47 @@ Headers::Delete(string key)
 		headers_.erase(h);
 }
 
-Header*
-Headers::Get(string key)
+const Header*
+Headers::Get(const string& key) const
 {
 	const auto& h = headers_.find(key);
 	if (h == headers_.end())
 		return 0;
 	else
 		return &h->second;
+}
+
+const string
+Headers::GetFirst(const string& key) const
+{
+	const auto& h = headers_.find(key);
+	if (h == headers_.end())
+		return "";
+	else
+		return h->second.GetFirstValue();
+}
+
+void
+Headers::Merge(const Headers& headers)
+{
+	for (const std::pair<string, Header> h : headers.headers_)
+	{
+		for (const string& val : headers.Get(h.first)->GetValues())
+		{
+			Add(h.first, val);
+		}
+	}
+}
+
+list<string>
+Headers::HeaderNames() const
+{
+	list<string> names;
+
+	for (const std::pair<string, Header> h : headers_)
+		names.push_back(h.first);
+
+	return names;
 }
 }  // namespace server
 }  // namespace http

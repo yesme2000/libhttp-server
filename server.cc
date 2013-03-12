@@ -33,7 +33,9 @@
 #include <string>
 #include <thread++/threadpool.h>
 #include <toolbox/scopedptr.h>
+
 #include "server.h"
+#include "server_internal.h"
 
 namespace http
 {
@@ -57,29 +59,29 @@ public:
 	{
 	}
 
-	virtual Protocol* PeerProtocol()
+	virtual Protocol* PeerProtocol() const
 	{
 		return proto_;
 	}
 
-	virtual string PeerAddress()
+	virtual string PeerAddress() const
 	{
 		return sock_->PeerAsText();
 	}
 
-	virtual Connection* PeerSocket()
+	virtual Connection* PeerSocket() const
 	{
 		return sock_;
 	}
 
-	virtual Server* Parent()
+	virtual Server* Parent() const
 	{
 		return sock_->GetServer();
 	}
 
 private:
-	Protocol* proto_;
-	Connection* sock_;
+	Protocol* const proto_;
+	Connection* const sock_;
 };
 
 WebServer::WebServer()
@@ -92,13 +94,13 @@ WebServer::~WebServer()
 }
 
 void
-WebServer::Handle(string pattern, Handler* handler)
+WebServer::Handle(const string& pattern, Handler* handler)
 {
-	multiplexer_.Handle(pattern, handler);
+	multiplexer_->Handle(pattern, handler);
 }
 
 void
-WebServer::ListenAndServe(string addr, Protocol* protocol)
+WebServer::ListenAndServe(const string& addr, Protocol* protocol)
 {
 	Server srv(addr, 0, num_threads_);
 	Serve(&srv, protocol);
@@ -114,7 +116,7 @@ WebServer::Serve(Server* srv, Protocol* proto)
 		executor_.Reset(new ThreadPool(num_threads_));
 
 	srv->SetConnectionCallback(new ProtocolServer(this, proto,
-				&multiplexer_));
+				multiplexer_.Get()));
 	servers_.push_back(srv);
 	srv->Listen();
 }
@@ -146,13 +148,14 @@ WebServer::GetExecutor()
 }
 
 void
-WebServer::ServeConnection(Peer* peer)
+WebServer::ServeConnection(const Peer* peer)
 {
 	Protocol* proto = peer->PeerProtocol();
-	proto->DecodeConnection(executor_.Get(), &multiplexer_, peer);
+	proto->DecodeConnection(executor_.Get(), multiplexer_.Get(), peer);
 }
 
-ProtocolServer::ProtocolServer(WebServer* parent, Protocol* proto, ServeMux* mux)
+ProtocolServer::ProtocolServer(WebServer* parent, Protocol* proto,
+	       	ServeMux* mux)
 : parent_(parent), proto_(proto), multiplexer_(mux)
 {
 }
@@ -184,6 +187,10 @@ ProtocolServer::Error(Connection* conn)
 }
 
 Protocol::~Protocol()
+{
+}
+
+Peer::~Peer()
 {
 }
 }  // namespace server

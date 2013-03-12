@@ -89,13 +89,17 @@ TEST_F(HeadersTest, AddSetDelGet)
 	h.Set("Connection", "close");
 	h.Add("Connection", "keep-alive");
 
-	Header* conn = h.Get("Connection");
+	const Header* conn = h.Get("Connection");
 	ASSERT_NE((Header*) 0, conn);
 
 	list<string> values = conn->GetValues();
 	EXPECT_EQ(2, values.size());
 	EXPECT_EQ("close", values.front());
 	EXPECT_EQ("keep-alive", values.back());
+
+	values = h.HeaderNames();
+	EXPECT_EQ(1, values.size());
+	EXPECT_EQ("Connection", values.front());
 
 	h.Set("Connection", "closed");
 	conn = h.Get("Connection");
@@ -105,8 +109,15 @@ TEST_F(HeadersTest, AddSetDelGet)
 	EXPECT_EQ(1, values.size());
 	EXPECT_EQ("closed", values.front());
 
+	values = h.HeaderNames();
+	EXPECT_EQ(1, values.size());
+	EXPECT_EQ("Connection", values.front());
+
 	h.Delete("Connection");
 	EXPECT_EQ(0, h.Get("Connection"));
+
+	values = h.HeaderNames();
+	EXPECT_EQ(0, values.size());
 }
 
 } /* namespace testing */

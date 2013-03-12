@@ -27,25 +27,37 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "server.h"
 #include <string>
+#include <iostream>
+#include <siot/linebufferdecorator.h>
+
+#include "server.h"
+#include "server_internal.h"
 
 namespace http
 {
 namespace server
 {
+using std::string;
+using toolbox::siot::LineBufferDecorator;
+
 class HTTProtocol : public Protocol
 {
 public:
 	HTTProtocol();
+	virtual ~HTTProtocol();
 
 	// Implements Protocol.
 	virtual bool WantsTLS();
 	virtual void DecodeConnection(threadpp::ThreadPool* executor,
-			ServeMux* mux, Peer* peer);
+			const ServeMux* mux, const Peer* peer);
 };
 
 HTTProtocol::HTTProtocol()
+{
+}
+
+HTTProtocol::~HTTProtocol()
 {
 }
 
@@ -57,8 +69,47 @@ HTTProtocol::WantsTLS()
 
 void
 HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
-		ServeMux* mux, Peer* peer)
+		const ServeMux* mux, const Peer* peer)
 {
+	LineBufferDecorator reader(peer->PeerSocket());
+	HTTPResponseWriter rw(peer->PeerSocket());
+	Request req;
+	string command_str = reader.Receive();
+	size_t pos, lpos;
+	Headers* hdr = new Headers;
+	string command;
+	string path;
+	string protocol;
+
+	pos = command_str.find(' ');
+	lpos = command_str.rfind(' ');
+	if (pos == string::npos || lpos == string::npos || pos == lpos)
+	{
+		ScopedPtr<Handler> err =
+			Handler::ErrorHandler(400, "Invalid Request");
+		err->ServeHTTP(&rw, &req);
+		delete hdr;
+		return;
+	}
+	req.SetProtocol(command_str.substr(lpos));
+	req.SetAction(command_str.substr(0, pos - 1));
+	req.SetPath(command_str.substr(pos + 1, lpos - pos - 1));
+
+	string line = reader.Receive();
+
+	while (line.length() > 0 && line != "\n")
+	{
+		size_t offset = line.find(':');
+		string key = line.substr(0, offset);
+
+		while (line[++offset] == ' ' && offset < line.length());
+
+		string value = line.substr(offset, line.length() - offset - 1);
+		hdr->Add(key, value);
+		line = reader.Receive();
+	}
+
+	req.SetHeaders(hdr);
 }
 
 Protocol*

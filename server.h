@@ -33,20 +33,23 @@
 #include <list>
 #include <map>
 #include <mutex>
-#include <siot/connection.h>
 #include <string>
+#include <utility>
+
+#include <siot/connection.h>
+#include <siot/server.h>
 #include <thread++/threadpool.h>
 #include <toolbox/scopedptr.h>
-#include <siot/server.h>
 
 namespace http
 {
 namespace server
 {
-using std::string;
 using std::list;
 using std::map;
 using std::mutex;
+using std::pair;
+using std::string;
 using toolbox::ScopedPtr;
 
 using toolbox::siot::Connection;
@@ -54,50 +57,14 @@ using toolbox::siot::ConnectionCallback;
 using toolbox::siot::Server;
 
 class Headers;
+class Peer;
 class Protocol;
+class ProtocolServer;
 class Request;
 class ServeMux;
 
 // Convert a string to a URL encoded string.
 string URLEncode(string input, bool skip_spaces = false);
-
-// Representation of the connections peer.
-class Peer
-{
-public:
-	virtual ~Peer();
-
-	virtual Protocol* PeerProtocol() = 0;
-	virtual string PeerAddress() = 0;
-	virtual Connection* PeerSocket() = 0;
-	virtual Server* Parent() = 0;
-};
-
-// Callback class to receive information from a Protocol implementation.
-// FIXME(tonnerre): Perhaps come up with a data structure instead of the SID
-// hack.
-class ProtocolObserver
-{
-public:
-	virtual ~ProtocolObserver();
-
-	// Reset all data received from the protocol for the given session,
-	// e.g. if a new connection was made.
-	virtual void ClearProtocolData(Peer* p) = 0;
-
-	// Sets the headers for the given connection SID to exactly the value.
-	virtual void SetHeader(Peer* p, Headers new_headers) = 0;
-
-	// Adds the given header to the currently known set (for protocols with
-	// incremental headers).
-	virtual void AddHeader(Peer* p, Headers incremental_headers) = 0;
-
-	// Removes the given headers from the currently known set.
-	virtual void RemoveHeader(Peer* p, Headers decremental_headers) = 0;
-
-	// Indicates that a new request has been recevied.
-	virtual void ProcessRequest(Peer* p, Request* req) = 0;
-};
 
 // Wire protocol decoder class.
 class Protocol
@@ -118,7 +85,7 @@ public:
 	// Instruct the protocol decoder to start decoding the data on the
 	// socket.
 	virtual void DecodeConnection(threadpp::ThreadPool* executor,
-			ServeMux* mux, Peer* peer) = 0;
+			const ServeMux* mux, const Peer* peer) = 0;
 };
 
 // A regular HTTP/SPDY/? header. Can contain multiple values.
@@ -184,8 +151,17 @@ public:
 	// Remove all values recorded for key, if any.
 	void Delete(string key);
 
+	// Gets the first value of the header.
+	const string GetFirst(const string& key) const;
+
 	// Get all values associated with key.
-	Header* Get(string key);
+	const Header* Get(const string& key) const;
+
+	// Merge in the values of the new header lines.
+	void Merge(const Headers& headers);
+
+	// Retrieves a list of all header names.
+	list<string> HeaderNames() const;
 
 private:
 	map<string, Header> headers_;
@@ -194,7 +170,6 @@ private:
 // Backchannel for responses back to the client.
 class ResponseWriter
 {
-	// TODO(tonnerre): Add.
 public:
 	virtual ~ResponseWriter();
 
@@ -202,7 +177,7 @@ public:
 	virtual void AddHeaders(const Headers& to_add) = 0;
 
 	// Write the response out with the given status code.
-	virtual void WriteHeader(int status_code) = 0;
+	virtual void WriteHeader(int status_code, string message = "OK") = 0;
 
 	// Write the given data to the HTTP/SPDY/? connection. Unlike
 	// WriteHeader, this can be called repeatedly. If WriteHeader hasn't
@@ -241,17 +216,70 @@ struct Cookie
 // HTTP/SPDY/? request object.
 class Request
 {
-	// TODO(tonnerre): Add.
 public:
 	virtual ~Request();
 
-	void AddCookie(Cookie* c);
-	list<Cookie*> GetCookies();
-	string FirstFormValue(string key);
-	bool ProtoAtLeast(int major, int minor);
-	string Referer();
-	string UserAgent();
-	void SetBasicAuth(string username, string password);
+	// Adds a cookie to the request object.
+	virtual void AddCookie(Cookie* c);
+
+	// Returns the list of all cookies currently set.
+	virtual list<Cookie*> GetCookies() const;
+
+	// Sets the headers to the given set. Takes ownership of the headers.
+	virtual void SetHeaders(Headers* headers);
+
+	// Retrieves the headers for this request object.
+	virtual Headers* GetHeaders() const;
+
+	// Finds the first value for "key" in the submitted form and returns
+	// it.
+	virtual string FirstFormValue(const string& key) const;
+
+	// Verifies that the requested protocol version is >= major.minor.
+	virtual bool ProtoAtLeast(int major, int minor) const;
+
+	// Gets the referer, if specified (extracted from headers).
+	virtual string Referer() const;
+
+	// Gets the user agent, if specified (extracted from headers).
+	virtual string UserAgent() const;
+
+	// Gets the host header, if specified (extracted from headers).
+	virtual string Host() const;
+
+	// Set the path of the request to the given value.
+	virtual void SetPath(const string& path);
+
+	// Retrieves the path specified in the request object.
+	virtual string Path() const;
+
+	// Sets the protocol string used in the request.
+	virtual void SetProtocol(const string& proto);
+
+	// Retrieves the protocol name used in the request (including version).
+	virtual string Protocol() const;
+
+	// Sets the action string used for the request.
+	virtual void SetAction(const string& action);
+
+	// Retrieves the action specified in the request (GET, POST, etc.).
+	virtual string Action() const;
+
+	// Configure basic authentication for the request.
+	virtual void SetBasicAuth(const string& username,
+			const string& password);
+
+	// Get username and password from the basic authentication
+	// configuration of the request.
+	virtual pair<string, string> GetBasicAuth() const;
+
+private:
+	map<string, Cookie*> cookies_;
+	map<string, list<string> > form_values_;
+	ScopedPtr<Headers> headers_;
+	string path_;
+	string protocol_;
+	string action_;
 };
 
 // Prototype for a handler for requests.
@@ -262,23 +290,10 @@ public:
 
 	// Serve the request "req" writing the response out to "w".
 	// The details are left to the implementor.
-	virtual void ServeHTTP(const ResponseWriter& w, Request* req) = 0;
-};
+	virtual void ServeHTTP(ResponseWriter* w, const Request* req) = 0;
 
-// Helper class for distributing the requests efficiently to their handlers.
-class ServeMux
-{
-public:
-	virtual ~ServeMux();
-
-	// Handle all requests to a regexp matching pattern using handler.
-	void Handle(string pattern, Handler* handler);
-
-	// Find the handler for the given URL (closest matching pattern).
-	Handler* GetHandler(string URL);
-
-private:
-	map<string, Handler*> candidates_;
+	// Error message with the given error code and string.
+	static Handler* ErrorHandler(int errcode, const string& message);
 };
 
 // The actual HTTP server. By default, it runs on a threadpool with 10
@@ -293,11 +308,11 @@ public:
 	virtual ~WebServer();
 
 	// Handle all requests to a regexp matching pattern using handler.
-	void Handle(string pattern, Handler* handler);
+	void Handle(const string& pattern, Handler* handler);
 
 	// Listen and serve using the protocol decoder proto on the address
 	// addr.
-	void ListenAndServe(string addr, Protocol* proto);
+	void ListenAndServe(const string& addr, Protocol* proto);
 
 	// Serve as the protocol proto on the TCP service srv. This method
 	// will block forever, waiting for new connections. If you want to
@@ -328,33 +343,14 @@ public:
 	void Shutdown();
 
 private:
-	void ServeConnection(Peer* peer);
+	void ServeConnection(const Peer* peer);
 
-	ServeMux multiplexer_;
+	ScopedPtr<ServeMux> multiplexer_;
 	mutex executor_lock_;
 	ScopedPtr<threadpp::ThreadPool> executor_;
 	list<Server*> servers_;
 	uint32_t num_threads_;
 	bool shutdown_;
-};
-
-// An instance of the server taking care of a specific protocol.
-class ProtocolServer : public toolbox::siot::ConnectionCallback
-{
-public:
-	ProtocolServer(WebServer* parent, Protocol* proto, ServeMux* mux);
-	virtual ~ProtocolServer();
-
-	// Implements ConnectionCallback.
-	virtual void ConnectionEstablished(Connection* conn);
-	virtual void DataReady(Connection* conn);
-	virtual void ConnectionTerminated(Connection* conn);
-	virtual void Error(Connection* conn);
-
-private:
-	WebServer* parent_;
-	Protocol* proto_;
-	ServeMux* multiplexer_;
 };
 
 }  // namespace server

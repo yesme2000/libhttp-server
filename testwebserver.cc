@@ -27,26 +27,21 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <map>
-#include <string>
-
 #include "server.h"
-#include "server_internal.h"
+#include <signal.h>
 
-namespace http
-{
-namespace server
-{
-using std::string;
+using http::server::WebServer;
+using http::server::Protocol;
 
-ServeMux::~ServeMux()
+static WebServer ws;
+
+void shutdown_ws(int sig)
 {
+	ws.Shutdown();
 }
 
-void
-ServeMux::Handle(string pattern, Handler* handler)
+int main(void)
 {
-	candidates_.insert(std::make_pair(pattern, handler));
+	signal(SIGINT, shutdown_ws);
+	ws.ListenAndServe("[::1]:8889", Protocol::HTTP());
 }
-}  // namespace server
-}  // namespace http

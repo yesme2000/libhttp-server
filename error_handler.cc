@@ -27,7 +27,6 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <map>
 #include <string>
 
 #include "server.h"
@@ -39,14 +38,49 @@ namespace server
 {
 using std::string;
 
-ServeMux::~ServeMux()
+// Error message with the given error code and string.
+class ErrorHandlerImpl : public Handler
+{
+public:
+	ErrorHandlerImpl(int errcode, const string& message);
+	virtual ~ErrorHandlerImpl();
+
+	// Serve an error message with the given error code and string.
+	virtual void ServeHTTP(ResponseWriter* w, const Request* req);
+
+private:
+	int code_;
+	string message_;
+};
+
+Handler::~Handler()
+{
+}
+
+ErrorHandlerImpl::ErrorHandlerImpl(int errcode, const string& message)
+: code_(errcode), message_(message)
+{
+}
+
+ErrorHandlerImpl::~ErrorHandlerImpl()
 {
 }
 
 void
-ServeMux::Handle(string pattern, Handler* handler)
+ErrorHandlerImpl::ServeHTTP(ResponseWriter* w, const Request* req)
 {
-	candidates_.insert(std::make_pair(pattern, handler));
+	Headers h;
+	h.Add("Content-type", "text/plain");
+
+	w->AddHeaders(h);
+	w->WriteHeader(code_);
+	w->Write(message_);
+}
+
+Handler*
+Handler::ErrorHandler(int errcode, const string& message)
+{
+	return new ErrorHandlerImpl(errcode, message);
 }
 }  // namespace server
 }  // namespace http
