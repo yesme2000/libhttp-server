@@ -142,6 +142,18 @@ TEST_F(RequestTest, BasicAuth)
 	EXPECT_EQ("user", auth.first);
 	EXPECT_EQ("password", auth.second);
 }
+
+TEST_F(RequestTest, AsURL)
+{
+	Request r;
+	Headers* hdr = new Headers;
+
+	hdr->Set("Host", "lolcathost.example.com");
+
+	r.SetHeaders(hdr);
+	r.SetPath("/foo/bar");
+	EXPECT_EQ("http://lolcathost.example.com/foo/bar", r.AsURL());
+}
 }  // namespace testing
 }  // namespace server
 }  // namespace http

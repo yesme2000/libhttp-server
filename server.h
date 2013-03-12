@@ -273,6 +273,9 @@ public:
 	// configuration of the request.
 	virtual pair<string, string> GetBasicAuth() const;
 
+	// Formulate the current request as an URL.
+	virtual string AsURL() const;
+
 private:
 	map<string, Cookie*> cookies_;
 	map<string, list<string> > form_values_;

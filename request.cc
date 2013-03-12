@@ -214,5 +214,11 @@ Request::GetBasicAuth() const
 
 	return std::make_pair(user, pass);
 }
+
+string
+Request::AsURL() const
+{
+	return "http://" + Host() + Path();
+}
 }  // namespace server
 }  // namespace http
