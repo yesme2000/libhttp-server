@@ -61,6 +61,7 @@ HTTPResponseWriter::AddHeaders(const Headers& to_add)
 void
 HTTPResponseWriter::WriteHeader(int status_code, string message)
 {
+	written_ = true;
 	if (!headers_.Get("Connection"))
 		headers_.Set("Connection", "keep-alive");
 
