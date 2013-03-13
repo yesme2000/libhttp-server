@@ -33,22 +33,25 @@
 #include <list>
 #include <map>
 #include <mutex>
-#include <siot/connection.h>
+#include <regex>
 #include <string>
+
 #include <thread++/threadpool.h>
 #include <toolbox/scopedptr.h>
+#include <siot/connection.h>
 #include <siot/server.h>
 
 namespace http
 {
 namespace server
 {
-using std::string;
 using std::list;
 using std::map;
 using std::mutex;
-using toolbox::ScopedPtr;
+using std::regex;
+using std::string;
 
+using toolbox::ScopedPtr;
 using toolbox::siot::Connection;
 using toolbox::siot::ConnectionCallback;
 using toolbox::siot::Server;
@@ -102,11 +105,11 @@ class ServeMux
 public:
 	virtual ~ServeMux();
 
-	// Handle all requests to a regexp matching pattern using handler.
-	void Handle(string pattern, Handler* handler);
+	// Handle all requests to a prefix pattern using handler.
+	void Handle(const string& pattern, Handler* handler);
 
-	// Find the handler for the given URL (closest matching pattern).
-	Handler* GetHandler(string URL);
+	// Find the handler for the given path (closest matching prefix).
+	Handler* GetHandler(const string& path);
 
 private:
 	map<string, Handler*> candidates_;

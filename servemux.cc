@@ -29,6 +29,9 @@
 
 #include <map>
 #include <string>
+#include <regex>
+
+#include <iostream>
 
 #include "server.h"
 #include "server_internal.h"
@@ -37,16 +40,41 @@ namespace http
 {
 namespace server
 {
+using std::pair;
+using std::regex;
 using std::string;
+
+static inline bool
+starts_with(string a, string b)
+{
+	if (a.length() > b.length())
+		return false;
+
+	return b.substr(0, a.length()) == a;
+}
 
 ServeMux::~ServeMux()
 {
 }
 
 void
-ServeMux::Handle(string pattern, Handler* handler)
+ServeMux::Handle(const string& pattern, Handler* handler)
 {
 	candidates_.insert(std::make_pair(pattern, handler));
+}
+
+Handler*
+ServeMux::GetHandler(const string& path)
+{
+	Handler* ret = 0;
+
+	for (pair<string, Handler*> p : candidates_)
+	{
+		if (starts_with(p.first, path))
+			ret = p.second;
+	}
+
+	return ret;
 }
 }  // namespace server
 }  // namespace http

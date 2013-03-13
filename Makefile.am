@@ -1,4 +1,5 @@
-TESTS=				header_test cookie_test request_test
+TESTS=				header_test cookie_test request_test	\
+				servemux_test
 check_PROGRAMS=			${TESTS}
 bin_PROGRAMS=			testwebserver
 lib_LTLIBRARIES=		libhttp-server.la
