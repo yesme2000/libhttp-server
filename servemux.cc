@@ -64,7 +64,7 @@ ServeMux::Handle(const string& pattern, Handler* handler)
 }
 
 Handler*
-ServeMux::GetHandler(const string& path)
+ServeMux::GetHandler(const string& path) const
 {
 	Handler* ret = 0;
 

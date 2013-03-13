@@ -109,7 +109,7 @@ public:
 	void Handle(const string& pattern, Handler* handler);
 
 	// Find the handler for the given path (closest matching prefix).
-	Handler* GetHandler(const string& path);
+	Handler* GetHandler(const string& path) const;
 
 private:
 	map<string, Handler*> candidates_;
