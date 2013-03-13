@@ -5,6 +5,7 @@ bin_PROGRAMS=			testwebserver
 lib_LTLIBRARIES=		libhttp-server.la
 httpserverincludedir=		${includedir}/http
 httpserverinclude_HEADERS=	server.h
+noinst_HEADERS=			server_internal.h
 
 testwebserver_SOURCES=		testwebserver.cc
 testwebserver_LDADD=		${AC_LIBS} ${lib_LTLIBRARIES}
