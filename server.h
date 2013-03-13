@@ -265,6 +265,9 @@ public:
 	// Retrieves the action specified in the request (GET, POST, etc.).
 	virtual string Action() const;
 
+	// Sets the schema of the request; only used for URL formulation.
+	virtual void SetSchema(const string& schema);
+
 	// Configure basic authentication for the request.
 	virtual void SetBasicAuth(const string& username,
 			const string& password);
@@ -280,6 +283,7 @@ private:
 	map<string, Cookie*> cookies_;
 	map<string, list<string> > form_values_;
 	ScopedPtr<Headers> headers_;
+	string schema_;
 	string path_;
 	string protocol_;
 	string action_;

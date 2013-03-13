@@ -180,6 +180,12 @@ Request::Action() const
 }
 
 void
+Request::SetSchema(const string& schema)
+{
+	schema_ = schema;
+}
+
+void
 Request::SetBasicAuth(const string& username, const string& password)
 {
 	if (headers_.IsNull())
@@ -218,7 +224,7 @@ Request::GetBasicAuth() const
 string
 Request::AsURL() const
 {
-	return "http://" + Host() + Path();
+	return schema_ + "://" + Host() + path_;
 }
 }  // namespace server
 }  // namespace http
