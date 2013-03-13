@@ -105,7 +105,35 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		while (line[++offset] == ' ' && offset < line.length());
 
 		string value = line.substr(offset, line.length() - offset - 1);
-		hdr->Add(key, value);
+
+		if (key == "Cookie")
+		{
+			size_t prev = 0, pos = -2;
+
+			do
+			{
+				prev = pos + 2;
+				pos = value.find("; ", prev);
+
+				if (pos == string::npos)
+					pos = value.length();
+
+				string cookie = value.substr(prev, pos - prev);
+				size_t eq = cookie.find('=');
+				if (eq != string::npos)
+				{
+					Cookie* ck = new Cookie;
+					ck->name = cookie.substr(0, eq);
+					// TODO(tonnerre): decode?
+					ck->value = cookie.substr(eq + 1);
+
+					req.AddCookie(ck);
+				}
+			}
+			while (pos < value.length());
+		}
+		else
+			hdr->Add(key, value);
 		line = reader.Receive();
 	}
 
