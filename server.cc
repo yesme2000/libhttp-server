@@ -85,7 +85,7 @@ private:
 };
 
 WebServer::WebServer()
-: num_threads_(10), shutdown_(false)
+: multiplexer_(new ServeMux), num_threads_(10), shutdown_(false)
 {
 }
 
