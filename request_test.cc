@@ -150,6 +150,7 @@ TEST_F(RequestTest, AsURL)
 
 	hdr->Set("Host", "lolcathost.example.com");
 
+	r.SetSchema("http");
 	r.SetHeaders(hdr);
 	r.SetPath("/foo/bar");
 	EXPECT_EQ("http://lolcathost.example.com/foo/bar", r.AsURL());
