@@ -110,6 +110,17 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 	}
 
 	req.SetHeaders(hdr);
+
+	ScopedPtr<Handler> handler = mux->GetHandler(req.Path());
+	if (handler.IsNull())
+	{
+		ScopedPtr<Handler> err =
+			Handler::ErrorHandler(404, "Not Found");
+		err->ServeHTTP(&rw, &req);
+		return;
+	}
+
+	handler->ServeHTTP(&rw, &req);
 }
 
 Protocol*
