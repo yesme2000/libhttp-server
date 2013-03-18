@@ -151,6 +151,9 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 	}
 
 	handler->ServeHTTP(&rw, &req);
+
+	if (hdr->GetFirst("Connection").substr(0, 5) == "close")
+		delete peer->PeerSocket();
 }
 
 Protocol*

@@ -61,8 +61,13 @@ HTTPResponseWriter::AddHeaders(const Headers& to_add)
 void
 HTTPResponseWriter::WriteHeader(int status_code, string message)
 {
+	if (written_)
+		return;
+
 	written_ = true;
-	if (!headers_.Get("Connection"))
+	if (!headers_.Get("Content-Length"))
+		headers_.Set("Connection", "close");
+	else if (!headers_.Get("Connection"))
 		headers_.Set("Connection", "keep-alive");
 
 	conn_->Send("HTTP/1.1 " + std::to_string(status_code) +
