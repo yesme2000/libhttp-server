@@ -339,6 +339,13 @@ public:
 	// will have no effect.
 	void SetNumThreads(uint32_t num_threads);
 
+	// Sets the idle timeout after which idle connections are terminated.
+	// If 0 or negative, the connections will be kept open indefinitely
+	// unless the client terminates them (not recommended). The default
+	// timeout is 180 seconds. This only applies to ListenAndServe, for
+	// Serve you can specify your own parameters as you see fit.
+	void SetIdleTimeout(int timeout);
+
 	// Gets the associated threadpool in case something else wants to
 	// run in it.
 	threadpp::ThreadPool* GetExecutor();
@@ -357,6 +364,7 @@ private:
 	ScopedPtr<threadpp::ThreadPool> executor_;
 	list<Server*> servers_;
 	uint32_t num_threads_;
+	int idle_timeout_;
 	bool shutdown_;
 };
 

@@ -85,7 +85,8 @@ private:
 };
 
 WebServer::WebServer()
-: multiplexer_(new ServeMux), num_threads_(10), shutdown_(false)
+: multiplexer_(new ServeMux), num_threads_(10), idle_timeout_(180),
+	shutdown_(false)
 {
 }
 
@@ -103,6 +104,8 @@ void
 WebServer::ListenAndServe(const string& addr, Protocol* protocol)
 {
 	Server srv(addr, 0, num_threads_);
+	if (idle_timeout_ > 0)
+		srv.SetMaxIdle(idle_timeout_);
 	Serve(&srv, protocol);
 }
 
@@ -132,6 +135,12 @@ void
 WebServer::SetNumThreads(uint32_t num_threads)
 {
 	num_threads_ = num_threads;
+}
+
+void
+WebServer::SetIdleTimeout(int timeout)
+{
+	idle_timeout_ = timeout;
 }
 
 void
@@ -183,6 +192,11 @@ ProtocolServer::ConnectionTerminated(Connection* conn)
 
 void
 ProtocolServer::Error(Connection* conn)
+{
+}
+
+void
+ProtocolServer::ConnectionFailed(string msg)
 {
 }
 

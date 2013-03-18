@@ -124,6 +124,7 @@ public:
 
 	// Implements ConnectionCallback.
 	virtual void ConnectionEstablished(Connection* conn);
+	virtual void ConnectionFailed(std::string msg);
 	virtual void DataReady(Connection* conn);
 	virtual void ConnectionTerminated(Connection* conn);
 	virtual void Error(Connection* conn);

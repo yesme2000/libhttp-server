@@ -71,7 +71,7 @@ void
 HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		const ServeMux* mux, const Peer* peer)
 {
-	LineBufferDecorator reader(peer->PeerSocket());
+	LineBufferDecorator reader(peer->PeerSocket(), false);
 	HTTPResponseWriter rw(peer->PeerSocket());
 	Request req;
 	string command_str = reader.Receive();
@@ -89,6 +89,8 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 			Handler::ErrorHandler(400, "Invalid Request");
 		err->ServeHTTP(&rw, &req);
 		delete hdr;
+		// Cut the connection, the peer isn't making any sense.
+		delete peer->PeerSocket();
 		return;
 	}
 	req.SetProtocol(command_str.substr(lpos));
@@ -139,8 +141,8 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 
 	req.SetHeaders(hdr);
 
-	ScopedPtr<Handler> handler = mux->GetHandler(req.Path());
-	if (handler.IsNull())
+	Handler* handler = mux->GetHandler(req.Path());
+	if (!handler)
 	{
 		ScopedPtr<Handler> err =
 			Handler::ErrorHandler(404, "Not Found");
