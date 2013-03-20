@@ -37,6 +37,7 @@
 #include <utility>
 
 #include <siot/connection.h>
+#include <siot/ssl.h>
 #include <siot/server.h>
 #include <thread++/threadpool.h>
 #include <toolbox/scopedptr.h>
@@ -55,6 +56,7 @@ using toolbox::ScopedPtr;
 using toolbox::siot::Connection;
 using toolbox::siot::ConnectionCallback;
 using toolbox::siot::Server;
+using toolbox::siot::ssl::ServerSSLContext;
 
 class Headers;
 class Peer;
@@ -76,11 +78,14 @@ public:
 	static Protocol* HTTP();
 
 	// Create a protocol parser for HTTPS and return it.
-	static Protocol* HTTPS();
+	static Protocol* HTTPS(const ServerSSLContext* context);
 
 	// Indicates whether or not the socket should be initialized as TLS for
 	// this connection.
 	virtual bool WantsTLS() = 0;
+
+	// Gets the associated SSL context, or nothing.
+	virtual const ServerSSLContext* GetContext() = 0;
 
 	// Instruct the protocol decoder to start decoding the data on the
 	// socket.

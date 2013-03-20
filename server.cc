@@ -104,6 +104,8 @@ void
 WebServer::ListenAndServe(const string& addr, Protocol* protocol)
 {
 	Server srv(addr, 0, num_threads_);
+	if (protocol->WantsTLS())
+		srv.SetServerSSLContext(protocol->GetContext());
 	if (idle_timeout_ > 0)
 		srv.SetMaxIdle(idle_timeout_);
 	Serve(&srv, protocol);

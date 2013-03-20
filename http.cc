@@ -49,8 +49,23 @@ public:
 
 	// Implements Protocol.
 	virtual bool WantsTLS();
+	virtual const ServerSSLContext* GetContext();
 	virtual void DecodeConnection(threadpp::ThreadPool* executor,
 			const ServeMux* mux, const Peer* peer);
+};
+
+class HTTPSProtocol : public HTTProtocol
+{
+public:
+	HTTPSProtocol(const ServerSSLContext* context);
+	virtual ~HTTPSProtocol();
+
+	// Implements HTTProtocol.
+	virtual bool WantsTLS();
+	virtual const ServerSSLContext* GetContext();
+
+private:
+	const ServerSSLContext* context_;
 };
 
 HTTProtocol::HTTProtocol()
@@ -65,6 +80,12 @@ bool
 HTTProtocol::WantsTLS()
 {
 	return false;
+}
+
+const ServerSSLContext*
+HTTProtocol::GetContext()
+{
+	return 0;
 }
 
 void
@@ -161,5 +182,33 @@ Protocol::HTTP()
 {
 	return new HTTProtocol();
 }
+
+HTTPSProtocol::HTTPSProtocol(const ServerSSLContext* context)
+: context_(context)
+{
+}
+
+HTTPSProtocol::~HTTPSProtocol()
+{
+}
+
+bool
+HTTPSProtocol::WantsTLS()
+{
+	return true;
+}
+
+const ServerSSLContext*
+HTTPSProtocol::GetContext()
+{
+	return context_;
+}
+
+Protocol*
+Protocol::HTTPS(const ServerSSLContext* context)
+{
+	return new HTTPSProtocol(context);
+}
+
 }  // namespace server
 }  // namespace http
