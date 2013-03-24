@@ -74,7 +74,7 @@ ErrorHandlerImpl::ServeHTTP(ResponseWriter* w, const Request* req)
 	h.Add("Content-Length", std::to_string(message_.length() + 4));
 
 	w->AddHeaders(h);
-	w->WriteHeader(code_);
+	w->WriteHeader(code_, message_);
 	w->Write(message_ + "\r\n\r\n");
 }
 
