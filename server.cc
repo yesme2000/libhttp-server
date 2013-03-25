@@ -32,6 +32,7 @@
 #include <siot/server.h>
 #include <string>
 #include <thread++/threadpool.h>
+#include <toolbox/expvar.h>
 #include <toolbox/scopedptr.h>
 
 #include "server.h"
@@ -48,8 +49,11 @@ using std::mutex;
 using std::string;
 using std::unique_lock;
 using threadpp::ThreadPool;
+using toolbox::ExpMap;
 using toolbox::siot::Connection;
 using toolbox::siot::Server;
+
+ExpMap<int64_t> clientConnectionErrors("client-connection-errors");
 
 class TCPPeer : public Peer
 {
@@ -179,7 +183,16 @@ void
 ProtocolServer::DataReady(Connection* conn)
 {
 	TCPPeer peer(proto_, conn);
-	proto_->DecodeConnection(parent_->GetExecutor(), multiplexer_, &peer);
+	try
+	{
+		proto_->DecodeConnection(parent_->GetExecutor(),
+				multiplexer_, &peer);
+	}
+	catch (toolbox::siot::ClientConnectionException ex)
+	{
+		clientConnectionErrors.Add(ex.identifier(), 1);
+		delete conn;
+	}
 }
 
 void
