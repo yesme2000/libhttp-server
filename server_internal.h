@@ -123,6 +123,7 @@ public:
 	virtual ~ProtocolServer();
 
 	// Implements ConnectionCallback.
+	virtual Connection* AddDecorators(Connection* in);
 	virtual void ConnectionEstablished(Connection* conn);
 	virtual void ConnectionFailed(std::string msg);
 	virtual void DataReady(Connection* conn);

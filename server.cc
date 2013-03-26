@@ -28,6 +28,7 @@
  */
 
 #include <mutex>
+#include <siot/acknowledgementdecorator.h>
 #include <siot/connection.h>
 #include <siot/server.h>
 #include <string>
@@ -50,6 +51,7 @@ using std::string;
 using std::unique_lock;
 using threadpp::ThreadPool;
 using toolbox::ExpMap;
+using toolbox::siot::AcknowledgementDecorator;
 using toolbox::siot::Connection;
 using toolbox::siot::Server;
 
@@ -177,6 +179,12 @@ ProtocolServer::ProtocolServer(WebServer* parent, Protocol* proto,
 
 ProtocolServer::~ProtocolServer()
 {
+}
+
+Connection*
+ProtocolServer::AddDecorators(Connection* in)
+{
+	return new AcknowledgementDecorator(in, 10485760);
 }
 
 void

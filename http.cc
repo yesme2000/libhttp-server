@@ -28,8 +28,7 @@
  */
 
 #include <string>
-#include <iostream>
-#include <siot/linebufferdecorator.h>
+#include <siot/acknowledgementdecorator.h>
 
 #include "server.h"
 #include "server_internal.h"
@@ -39,7 +38,7 @@ namespace http
 namespace server
 {
 using std::string;
-using toolbox::siot::LineBufferDecorator;
+using toolbox::siot::AcknowledgementDecorator;
 
 class HTTProtocol : public Protocol
 {
@@ -92,15 +91,40 @@ void
 HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		const ServeMux* mux, const Peer* peer)
 {
-	LineBufferDecorator reader(peer->PeerSocket(), false);
+	AcknowledgementDecorator* ack =
+		static_cast<AcknowledgementDecorator*>(peer->PeerSocket());
+	string alldata = ack->Receive();
+
+	if (alldata.find("\n\n") == string::npos &&
+			alldata.find("\r\n\r\n") == string::npos)
+		// Try again later when we have more data.
+		return;
+
 	HTTPResponseWriter rw(peer->PeerSocket());
 	Request req;
-	string command_str = reader.Receive();
-	size_t pos, lpos;
+	list<string> lines;
+	size_t pos = 0, lpos = 0;
 	Headers* hdr = new Headers;
 	string command;
 	string path;
 	string protocol;
+
+	while (lpos < alldata.length() &&
+			(pos = alldata.find("\n", lpos)) != string::npos)
+	{
+		size_t endpos = alldata[pos-1] == '\r' ? pos-1 : pos;
+
+		if (endpos != lpos)
+			lines.push_back(alldata.substr(lpos, endpos - lpos));
+		else
+			break;
+
+		lpos = pos + 1;
+	}
+	ack->Acknowledge(pos);
+
+	string command_str = lines.front();
+	lines.pop_front();
 
 	pos = command_str.find(' ');
 	lpos = command_str.rfind(' ');
@@ -118,16 +142,14 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 	req.SetAction(command_str.substr(0, pos - 1));
 	req.SetPath(command_str.substr(pos + 1, lpos - pos - 1));
 
-	string line = reader.Receive();
-
-	while (line.length() > 0 && line != "\n")
+	for (string line : lines)
 	{
 		size_t offset = line.find(':');
 		string key = line.substr(0, offset);
 
 		while (line[++offset] == ' ' && offset < line.length());
 
-		string value = line.substr(offset, line.length() - offset - 1);
+		string value = line.substr(offset, line.length() - offset);
 
 		if (key == "Cookie")
 		{
@@ -157,7 +179,6 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		}
 		else
 			hdr->Add(key, value);
-		line = reader.Receive();
 	}
 
 	req.SetHeaders(hdr);
