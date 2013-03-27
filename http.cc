@@ -121,7 +121,22 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 
 		lpos = pos + 1;
 	}
-	ack->Acknowledge(pos);
+	while (lpos < alldata.length() && (alldata[lpos] == '\r' ||
+				alldata[lpos] == '\n'))
+		lpos++;
+	alldata.clear();
+	ack->Acknowledge(lpos);
+
+	if (!lines.size())
+	{
+		ScopedPtr<Handler> err =
+			Handler::ErrorHandler(400, "Invalid Request");
+		err->ServeHTTP(&rw, &req);
+		delete hdr;
+		// Cut the connection, the peer isn't making any sense.
+		delete peer->PeerSocket();
+		return;
+	}
 
 	string command_str = lines.front();
 	lines.pop_front();
