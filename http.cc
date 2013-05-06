@@ -134,7 +134,7 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		err->ServeHTTP(&rw, &req);
 		delete hdr;
 		// Cut the connection, the peer isn't making any sense.
-		delete peer->PeerSocket();
+		peer->PeerSocket()->DeferredShutdown();
 		return;
 	}
 
@@ -150,7 +150,7 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		err->ServeHTTP(&rw, &req);
 		delete hdr;
 		// Cut the connection, the peer isn't making any sense.
-		delete peer->PeerSocket();
+		peer->PeerSocket()->DeferredShutdown();
 		return;
 	}
 	req.SetProtocol(command_str.substr(lpos));
@@ -204,13 +204,14 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		ScopedPtr<Handler> err =
 			Handler::ErrorHandler(404, "Not Found");
 		err->ServeHTTP(&rw, &req);
+		if (hdr->GetFirst("Connection").substr(0, 5) == "close")
+			peer->PeerSocket()->DeferredShutdown();
 		return;
 	}
 
 	handler->ServeHTTP(&rw, &req);
-
 	if (hdr->GetFirst("Connection").substr(0, 5) == "close")
-		delete peer->PeerSocket();
+		peer->PeerSocket()->DeferredShutdown();
 }
 
 Protocol*

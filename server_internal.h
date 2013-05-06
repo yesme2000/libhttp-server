@@ -32,7 +32,6 @@
 #include <chrono>
 #include <list>
 #include <map>
-#include <mutex>
 #include <regex>
 #include <string>
 
@@ -47,7 +46,6 @@ namespace server
 {
 using std::list;
 using std::map;
-using std::mutex;
 using std::regex;
 using std::string;
 

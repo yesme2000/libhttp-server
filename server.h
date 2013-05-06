@@ -32,13 +32,13 @@
 #include <chrono>
 #include <list>
 #include <map>
-#include <mutex>
 #include <string>
 #include <utility>
 
 #include <siot/connection.h>
 #include <siot/ssl.h>
 #include <siot/server.h>
+#include <thread++/mutex.h>
 #include <thread++/threadpool.h>
 #include <toolbox/scopedptr.h>
 
@@ -48,10 +48,10 @@ namespace server
 {
 using std::list;
 using std::map;
-using std::mutex;
 using std::pair;
 using std::string;
 using toolbox::ScopedPtr;
+using threadpp::Mutex;
 
 using toolbox::siot::Connection;
 using toolbox::siot::ConnectionCallback;
@@ -365,7 +365,7 @@ private:
 	void ServeConnection(const Peer* peer);
 
 	ScopedPtr<ServeMux> multiplexer_;
-	mutex executor_lock_;
+	ScopedPtr<Mutex> executor_lock_;
 	ScopedPtr<threadpp::ThreadPool> executor_;
 	list<Server*> servers_;
 	uint32_t num_threads_;

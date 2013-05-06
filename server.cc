@@ -27,11 +27,11 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <mutex>
 #include <siot/acknowledgementdecorator.h>
 #include <siot/connection.h>
 #include <siot/server.h>
 #include <string>
+#include <thread++/mutex.h>
 #include <thread++/threadpool.h>
 #include <toolbox/expvar.h>
 #include <toolbox/scopedptr.h>
@@ -46,9 +46,10 @@ namespace server
 using google::protobuf::Closure;
 using google::protobuf::NewCallback;
 using std::map;
-using std::mutex;
 using std::string;
 using std::unique_lock;
+using threadpp::Mutex;
+using threadpp::MutexLock;
 using threadpp::ThreadPool;
 using toolbox::ExpMap;
 using toolbox::siot::AcknowledgementDecorator;
@@ -91,8 +92,8 @@ private:
 };
 
 WebServer::WebServer()
-: multiplexer_(new ServeMux), num_threads_(10), idle_timeout_(180),
-	shutdown_(false)
+: multiplexer_(new ServeMux), executor_lock_(Mutex::Create()),
+	num_threads_(10), idle_timeout_(180), shutdown_(false)
 {
 }
 
@@ -121,7 +122,7 @@ void
 WebServer::Serve(Server* srv, Protocol* proto)
 {
 	shutdown_ = false;
-	unique_lock<mutex> lk(executor_lock_);
+	MutexLock lk(executor_lock_.Get());
 
 	if (executor_.IsNull())
 		executor_.Reset(new ThreadPool(num_threads_));
@@ -135,7 +136,7 @@ WebServer::Serve(Server* srv, Protocol* proto)
 void
 WebServer::SetExecutor(ThreadPool* executor)
 {
-	unique_lock<mutex> lk(executor_lock_);
+	MutexLock lk(executor_lock_.Get());
 	executor_.Reset(executor);
 }
 
@@ -199,7 +200,7 @@ ProtocolServer::DataReady(Connection* conn)
 	catch (toolbox::siot::ClientConnectionException ex)
 	{
 		clientConnectionErrors.Add(ex.identifier(), 1);
-		delete conn;
+		conn->DeferredShutdown();
 	}
 }
 
