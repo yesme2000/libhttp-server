@@ -72,7 +72,8 @@ DebugVarsHandler::ServeHTTP(ResponseWriter* w, const Request* req)
 
 		if (var)
 			// TODO(tonnerre): Escape properly.
-			w->Write("\"" + name + "\": " + var->String());
+			w->Write("\"" + name + "\": " + var->String() +
+					",\r\n");
 	}
 
 	w->Write("}\r\n");
