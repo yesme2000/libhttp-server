@@ -27,55 +27,24 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string>
-#include <toolbox/expvar.h>
-#include <toolbox/qsingleton.h>
-
-#include "server.h"
-#include "server_internal.h"
-#include "debug_vars.h"
+#ifndef HTTP_SERVER_DEBUG_VARS_H
+#define HTTP_SERVER_DEBUG_VARS_H 1
 
 namespace http
 {
 namespace server
 {
-using std::string;
-using toolbox::_private::ExpvarRegistry;
-using toolbox::ExpVarBase;
-using toolbox::QSingleton;
-
-DebugVarsHandler::DebugVarsHandler()
+// Handler for debug vars
+class DebugVarsHandler : public Handler
 {
+public:
+	DebugVarsHandler();
+	virtual ~DebugVarsHandler();
+
+	// Serve the list of debug variables as a JSON formatted text.
+	virtual void ServeHTTP(ResponseWriter* w, const Request* req);
+};
+}
 }
 
-DebugVarsHandler::~DebugVarsHandler()
-{
-}
-
-void
-DebugVarsHandler::ServeHTTP(ResponseWriter* w, const Request* req)
-{
-	ExpvarRegistry registry = QSingleton<ExpvarRegistry>::GetInstance();
-	Headers h;
-	h.Add("Content-type", "application/json; charset=utf-8");
-
-	w->AddHeaders(h);
-	w->WriteHeader(200, "OK");
-
-	w->Write("{\r\n");
-
-	// Write the names and values of all debug var keys out to the
-	// requester.
-	for (string name : registry.Keys())
-	{
-		ExpVarBase* var = registry.Lookup(name);
-
-		if (var)
-			// TODO(tonnerre): Escape properly.
-			w->Write("\"" + name + "\": " + var->String());
-	}
-
-	w->Write("}\r\n");
-}
-}  // namespace server
-}  // namespace http
+#endif /* HTTP_SERVER_DEBUG_VARS_H */
