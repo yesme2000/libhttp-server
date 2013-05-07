@@ -28,6 +28,7 @@
  */
 
 #include <string>
+#include <sstream>
 
 #include "server.h"
 #include "server_internal.h"
@@ -50,6 +51,10 @@ HTTPResponseWriter::HTTPResponseWriter(Connection* conn)
 
 HTTPResponseWriter::~HTTPResponseWriter()
 {
+	// If the connection was actually encoded as chunked, we need to
+	// send the final 0 byte to indicate the last chunk.
+	if (headers_.GetFirst("Transfer-Encoding") == "chunked")
+		conn_->Send("0\r\n\r\n");
 }
 
 void
@@ -66,7 +71,7 @@ HTTPResponseWriter::WriteHeader(int status_code, string message)
 
 	written_ = true;
 	if (!headers_.Get("Content-Length"))
-		headers_.Set("Connection", "close");
+		headers_.Set("Transfer-Encoding", "chunked");
 	else if (!headers_.Get("Connection"))
 		headers_.Set("Connection", "keep-alive");
 
@@ -88,6 +93,14 @@ HTTPResponseWriter::Write(string data)
 {
 	if (!written_)
 		WriteHeader(200);
+
+	if (headers_.GetFirst("Transfer-Encoding") == "chunked")
+	{
+		std::ostringstream oss;
+		oss << std::hex << data.length();
+		data = oss.str() + "\r\n" + data + "\r\n";
+	}
+
 	return conn_->Send(data);
 }
 }  // namespace server
