@@ -52,11 +52,14 @@ using threadpp::Mutex;
 using threadpp::MutexLock;
 using threadpp::ThreadPool;
 using toolbox::ExpMap;
+using toolbox::ExpVar;
 using toolbox::siot::AcknowledgementDecorator;
 using toolbox::siot::Connection;
 using toolbox::siot::Server;
 
-ExpMap<int64_t> clientConnectionErrors("client-connection-errors");
+static ExpVar<int64_t> numConnections("http-server-num-connections");
+static ExpVar<int64_t> numOpenConnections("http-server-open-connections");
+static ExpMap<int64_t> clientConnectionErrors("http-server-client-connection-errors");
 
 class TCPPeer : public Peer
 {
@@ -207,21 +210,26 @@ ProtocolServer::DataReady(Connection* conn)
 void
 ProtocolServer::ConnectionEstablished(Connection* conn)
 {
+	numConnections.Add(1);
+	numOpenConnections.Add(1);
 }
 
 void
 ProtocolServer::ConnectionTerminated(Connection* conn)
 {
+	numOpenConnections.Add(-1);
 }
 
 void
 ProtocolServer::Error(Connection* conn)
 {
+	clientConnectionErrors.Add("poll-error", 1);
 }
 
 void
 ProtocolServer::ConnectionFailed(string msg)
 {
+	clientConnectionErrors.Add(msg, 1);
 }
 
 Protocol::~Protocol()

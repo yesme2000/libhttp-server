@@ -29,6 +29,7 @@
 
 #include <string>
 #include <siot/acknowledgementdecorator.h>
+#include <toolbox/expvar.h>
 
 #include "server.h"
 #include "server_internal.h"
@@ -38,6 +39,8 @@ namespace http
 namespace server
 {
 using std::string;
+using toolbox::ExpMap;
+using toolbox::ExpVar;
 using toolbox::siot::AcknowledgementDecorator;
 
 class HTTProtocol : public Protocol
@@ -66,6 +69,9 @@ public:
 private:
 	const ServerSSLContext* context_;
 };
+
+static ExpVar<int64_t> numHttpRequests("http-server-num-http-requests");
+static ExpMap<int64_t> numHttpRequestErrors("http-server-http-request-errors");
 
 HTTProtocol::HTTProtocol()
 {
@@ -127,11 +133,14 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 	alldata.clear();
 	ack->Acknowledge(lpos);
 
+	numHttpRequests.Add(1);
+
 	if (!lines.size())
 	{
 		ScopedPtr<Handler> err =
 			Handler::ErrorHandler(400, "Invalid Request");
 		err->ServeHTTP(&rw, &req);
+		numHttpRequestErrors.Add("zero-sized-request", 1);
 		delete hdr;
 		// Cut the connection, the peer isn't making any sense.
 		peer->PeerSocket()->DeferredShutdown();
@@ -148,6 +157,7 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		ScopedPtr<Handler> err =
 			Handler::ErrorHandler(400, "Invalid Request");
 		err->ServeHTTP(&rw, &req);
+		numHttpRequestErrors.Add("unknown-protocol-header", 1);
 		delete hdr;
 		// Cut the connection, the peer isn't making any sense.
 		peer->PeerSocket()->DeferredShutdown();
@@ -204,6 +214,7 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		ScopedPtr<Handler> err =
 			Handler::ErrorHandler(404, "Not Found");
 		err->ServeHTTP(&rw, &req);
+		numHttpRequestErrors.Add("no-registered-handler", 1);
 		if (hdr->GetFirst("Connection").substr(0, 5) == "close")
 			peer->PeerSocket()->DeferredShutdown();
 		return;
