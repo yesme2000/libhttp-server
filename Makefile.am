@@ -15,7 +15,7 @@ testsslserver_LDADD=		${AC_LIBS} ${lib_LTLIBRARIES}
 
 libhttp_server_la_SOURCES=	cookie.cc error_handler.cc header.cc	\
 				http.cc request.cc responsewriter.cc	\
-				servemux.cc server.cc
+				servemux.cc server.cc debug_vars.cc
 libhttp_server_la_LDFLAGS=	-version-info ${LIBRARY_VERSION}
 libhttp_server_la_LIBADD=	${AC_LIBS}
 
