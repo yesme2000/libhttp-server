@@ -28,10 +28,12 @@
  */
 
 #include "server.h"
+#include "debug_vars.h"
 #include <signal.h>
 
 using http::server::WebServer;
 using http::server::Protocol;
+using http::server::DebugVarsHandler;
 
 static WebServer ws;
 
@@ -42,6 +44,8 @@ void shutdown_ws(int sig)
 
 int main(void)
 {
+	DebugVarsHandler* h = new DebugVarsHandler;
 	signal(SIGINT, shutdown_ws);
+	ws.Handle("/debug/vars/", h);
 	ws.ListenAndServe("[::1]:8889", Protocol::HTTP());
 }

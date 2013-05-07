@@ -28,11 +28,13 @@
  */
 
 #include "server.h"
+#include "debug_vars.h"
 #include <signal.h>
 #include <siot/ssl.h>
 
 using http::server::WebServer;
 using http::server::Protocol;
+using http::server::DebugVarsHandler;
 using toolbox::siot::ssl::ServerSSLContext;
 
 static WebServer ws;
@@ -45,6 +47,8 @@ void shutdown_ws(int sig)
 int main(void)
 {
 	ServerSSLContext ctx("test.crt", "test.key");
+	DebugVarsHandler* h = new DebugVarsHandler;
 	signal(SIGINT, shutdown_ws);
+	ws.Handle("/debug/vars/", h);
 	ws.ListenAndServe("[::1]:8843", Protocol::HTTPS(&ctx));
 }
