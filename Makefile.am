@@ -4,7 +4,7 @@ check_PROGRAMS=			${TESTS}
 bin_PROGRAMS=			testwebserver testsslserver
 lib_LTLIBRARIES=		libhttp-server.la
 httpserverincludedir=		${includedir}/http
-httpserverinclude_HEADERS=	server.h
+httpserverinclude_HEADERS=	server.h debug_vars.h
 noinst_HEADERS=			server_internal.h
 
 testwebserver_SOURCES=		testwebserver.cc
