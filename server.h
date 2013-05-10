@@ -222,6 +222,7 @@ struct Cookie
 class Request
 {
 public:
+	Request();
 	virtual ~Request();
 
 	// Adds a cookie to the request object.
@@ -281,12 +282,20 @@ public:
 	// configuration of the request.
 	virtual pair<string, string> GetBasicAuth() const;
 
+	// Set a request body reader for the connection. Takes ownership of
+	// the connection.
+	virtual void SetRequestBody(Connection* reader);
+
+	// Get the reader returning the request body (only!).
+	virtual Connection* GetRequestBody() const;
+
 	// Formulate the current request as an URL.
 	virtual string AsURL() const;
 
 private:
 	map<string, Cookie*> cookies_;
 	map<string, list<string> > form_values_;
+	Connection* request_body_reader_;
 	ScopedPtr<Headers> headers_;
 	string schema_;
 	string path_;

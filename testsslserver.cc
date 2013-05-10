@@ -50,5 +50,5 @@ int main(void)
 	DebugVarsHandler* h = new DebugVarsHandler;
 	signal(SIGINT, shutdown_ws);
 	ws.Handle("/debug/vars/", h);
-	ws.ListenAndServe("[::1]:8843", Protocol::HTTPS(&ctx));
+	ws.ListenAndServe("[::ffff:127.0.0.1]:8843", Protocol::HTTPS(&ctx));
 }

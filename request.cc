@@ -47,11 +47,19 @@ using std::list;
 using std::pair;
 using std::string;
 
+Request::Request()
+: request_body_reader_(0)
+{
+}
+
 Request::~Request()
 {
 	for (map<string, Cookie*>::iterator cookie = cookies_.begin();
 			cookie != cookies_.end(); cookie++)
 		delete cookie->second;
+
+	if (request_body_reader_)
+		request_body_reader_->Shutdown();
 }
 
 void
@@ -219,6 +227,18 @@ Request::GetBasicAuth() const
 	string pass = auth.substr(split+1);
 
 	return std::make_pair(user, pass);
+}
+
+void
+Request::SetRequestBody(Connection* reader)
+{
+	request_body_reader_ = reader;
+}
+
+Connection*
+Request::GetRequestBody() const
+{
+	return request_body_reader_;
 }
 
 string
