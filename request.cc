@@ -59,7 +59,7 @@ Request::~Request()
 		delete cookie->second;
 
 	if (request_body_reader_)
-		request_body_reader_->Shutdown();
+		request_body_reader_->DeferredShutdown();
 }
 
 void
