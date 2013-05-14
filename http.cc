@@ -143,7 +143,7 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		numHttpRequestErrors.Add("zero-sized-request", 1);
 		delete hdr;
 		// Cut the connection, the peer isn't making any sense.
-		peer->PeerSocket()->DeferredShutdown();
+		ack->DeferredShutdown();
 		return;
 	}
 
@@ -160,7 +160,7 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		numHttpRequestErrors.Add("unknown-protocol-header", 1);
 		delete hdr;
 		// Cut the connection, the peer isn't making any sense.
-		peer->PeerSocket()->DeferredShutdown();
+		ack->DeferredShutdown();
 		return;
 	}
 	req.SetProtocol(command_str.substr(lpos));
@@ -216,13 +216,13 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		err->ServeHTTP(&rw, &req);
 		numHttpRequestErrors.Add("no-registered-handler", 1);
 		if (hdr->GetFirst("Connection").substr(0, 5) == "close")
-			peer->PeerSocket()->DeferredShutdown();
+			ack->DeferredShutdown();
 		return;
 	}
 
 	handler->ServeHTTP(&rw, &req);
 	if (hdr->GetFirst("Connection").substr(0, 5) == "close")
-		peer->PeerSocket()->DeferredShutdown();
+		ack->DeferredShutdown();
 }
 
 Protocol*
