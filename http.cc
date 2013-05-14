@@ -29,6 +29,7 @@
 
 #include <string>
 #include <siot/acknowledgementdecorator.h>
+#include <siot/rangereaderdecorator.h>
 #include <toolbox/expvar.h>
 
 #include "server.h"
@@ -42,6 +43,7 @@ using std::string;
 using toolbox::ExpMap;
 using toolbox::ExpVar;
 using toolbox::siot::AcknowledgementDecorator;
+using toolbox::siot::RangeReaderDecorator;
 
 class HTTProtocol : public Protocol
 {
@@ -99,12 +101,21 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 {
 	AcknowledgementDecorator* ack =
 		static_cast<AcknowledgementDecorator*>(peer->PeerSocket());
+	// Only attempt processing if we can own the connection.
+	if (!ack->TryLock())
+		return;
+
+	ack->SetBlocking(true);
 	string alldata = ack->Receive();
+	ack->SetBlocking(false);
 
 	if (alldata.find("\n\n") == string::npos &&
 			alldata.find("\r\n\r\n") == string::npos)
+	{
 		// Try again later when we have more data.
+		ack->Unlock();
 		return;
+	}
 
 	HTTPResponseWriter rw(peer->PeerSocket());
 	Request req;
@@ -142,6 +153,7 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		err->ServeHTTP(&rw, &req);
 		numHttpRequestErrors.Add("zero-sized-request", 1);
 		delete hdr;
+		ack->Unlock();
 		// Cut the connection, the peer isn't making any sense.
 		ack->DeferredShutdown();
 		return;
@@ -159,6 +171,7 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		err->ServeHTTP(&rw, &req);
 		numHttpRequestErrors.Add("unknown-protocol-header", 1);
 		delete hdr;
+		ack->Unlock();
 		// Cut the connection, the peer isn't making any sense.
 		ack->DeferredShutdown();
 		return;
@@ -208,6 +221,20 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 
 	req.SetHeaders(hdr);
 
+	if (hdr->GetFirst("Content-Length").length() > 0)
+	{
+		unsigned long length =
+			strtoul(hdr->GetFirst("Content-Length").c_str(),
+					NULL, 10);
+
+		if (length > 0)
+		{
+			ack->SetAutoAck(true);
+			req.SetRequestBody(new RangeReaderDecorator(ack,
+						length));
+		}
+	}
+
 	Handler* handler = mux->GetHandler(req.Path());
 	if (!handler)
 	{
@@ -217,10 +244,13 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 		numHttpRequestErrors.Add("no-registered-handler", 1);
 		if (hdr->GetFirst("Connection").substr(0, 5) == "close")
 			ack->DeferredShutdown();
+		ack->Unlock();
 		return;
 	}
 
 	handler->ServeHTTP(&rw, &req);
+	ack->SetAutoAck(false);
+	ack->Unlock();
 	if (hdr->GetFirst("Connection").substr(0, 5) == "close")
 		ack->DeferredShutdown();
 }
