@@ -27,6 +27,7 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <algorithm>
 #include <string>
 #include <siot/acknowledgementdecorator.h>
 #include <siot/rangereaderdecorator.h>
@@ -73,6 +74,7 @@ private:
 };
 
 static ExpVar<int64_t> numHttpRequests("http-server-num-http-requests");
+static ExpMap<int64_t> numHttpHostRequests("http-server-http-requests-by-host");
 static ExpMap<int64_t> numHttpRequestErrors("http-server-http-request-errors");
 
 HTTProtocol::HTTProtocol()
@@ -234,6 +236,18 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 						length));
 		}
 	}
+
+	if (hdr->GetFirst("Host").length() > 0)
+	{
+		std::string Host = hdr->GetFirst("Host");
+		std::string host;
+		host.resize(Host.size());
+		std::transform(Host.begin(), Host.end(), host.begin(),
+				::tolower);
+		numHttpHostRequests.Add(host, 1);
+	}
+	else
+		numHttpHostRequests.Add("unknown", 1);
 
 	Handler* handler = mux->GetHandler(req.Path());
 	if (!handler)
