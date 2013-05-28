@@ -195,6 +195,8 @@ void
 ProtocolServer::DataReady(Connection* conn)
 {
 	TCPPeer peer(proto_, conn);
+	if (!conn->TryReadLock())
+		return;
 	try
 	{
 		proto_->DecodeConnection(parent_->GetExecutor(),
@@ -205,6 +207,7 @@ ProtocolServer::DataReady(Connection* conn)
 		clientConnectionErrors.Add(ex.identifier(), 1);
 		conn->DeferredShutdown();
 	}
+	conn->Unlock();
 }
 
 void

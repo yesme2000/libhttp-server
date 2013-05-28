@@ -104,7 +104,7 @@ HTTProtocol::DecodeConnection(threadpp::ThreadPool* executor,
 	AcknowledgementDecorator* ack =
 		static_cast<AcknowledgementDecorator*>(peer->PeerSocket());
 	// Only attempt processing if we can own the connection.
-	if (!ack->TryLock())
+	if (!ack->TryReadLock())
 		return;
 
 	ack->SetBlocking(true);
