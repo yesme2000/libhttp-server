@@ -30,8 +30,13 @@
 # OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+libtoolize_tool="libtoolize"
+if [ `(uname -s) 2>/dev/null` == 'Darwin' ]; then
+    libtoolize_tool="glibtoolize"
+fi
+
 aclocal
-libtoolize --copy
+${libtoolize_tool} --copy
 autoconf
 autoheader
 automake --add-missing --copy --foreign
